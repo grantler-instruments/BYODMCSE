@@ -1,10 +1,11 @@
 import { el } from "@elemaudio/core";
 import { v4 } from "uuid";
 import Base from "./Base";
+import { createConstRef, createGateRef } from "../voiceRefs";
 
-class DrumRack extends Base{
-  constructor(id, samples) {
-    super(id)
+class DrumRack extends Base {
+  constructor(id, samples, core) {
+    super(id);
     this.id = id;
     this.voices = samples;
 
@@ -12,41 +13,53 @@ class DrumRack extends Base{
       voice.gate = 0;
       voice.velocity = 0;
       voice.key = `drumrack-v${index}-${v4()}`;
+      const gate = createGateRef(core, voice.key);
+      const velocity = createConstRef(core, `velocity-${voice.key}`, 0);
+      voice.gateNode = gate.node;
+      voice.setGate = gate.setValue;
+      voice.velNode = velocity.node;
+      voice.setVelocity = velocity.setValue;
     });
   }
 
   voice = (voice) => {
-    const gate = el.const({
-      key: `gate-${voice.key}`,
-      value: voice.gate,
-    });
-    const env = el.env(4.0, 1.0, 0.4, 2.0, gate);
-    const out = el.sample({ path: voice.path, mode: "trigger" }, gate, 1.0);
-    return el.mul(out, voice.velocity);
+    const out = el.sample(
+      { path: voice.path, key: `sample-${voice.key}`, mode: "trigger" },
+      voice.gateNode,
+      1.0
+    );
+    return el.mul(out, voice.velNode);
   };
 
   noteOn(note, velocity) {
-    const voice = Object.entries(this.voices).find(([key, value]) => {
-      return key == note;
-    });
-    if (voice) {
-      voice.timestamp = new Date();
-      voice[1].gate = 1.0;
-      // TODO: setting a new key to restart the sample seems quite hacky, what are smarter ways of doing this?
-      voice[1].key = `drumrack-${v4()}`;
-      voice[1].velocity = velocity / 127;
-    }
+    void this.handleNoteOn(note, velocity);
   }
+
+  async handleNoteOn(note, velocity) {
+    const entry = Object.entries(this.voices).find(([key]) => key == note);
+    if (!entry) return;
+
+    const pad = entry[1];
+    pad.timestamp = new Date();
+    pad.velocity = velocity / 127;
+
+    await pad.setVelocity({ value: pad.velocity });
+
+    if (pad.gate === 1.0) {
+      await pad.setGate({ value: 0.0 });
+      pad.gate = 0.0;
+    }
+
+    await pad.setGate({ value: 1.0 });
+    pad.gate = 1.0;
+  }
+
   noteOff(note) {}
 
   render() {
     const voices = Object.values(this.voices);
-    const out = el.add(
-      ...voices.map((voice) => {
-        return this.voice(voice);
-      })
-    );
-    return out
+    const out = el.add(...voices.map((voice) => this.voice(voice)));
+    return out;
   }
 }
 

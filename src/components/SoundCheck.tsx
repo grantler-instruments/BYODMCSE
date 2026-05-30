@@ -15,7 +15,6 @@ function SoundCheck() {
   const listenToMidi = useLiveSetStore((state) => state.listenToMidi);
   const subscribeToMqtt = useLiveSetStore((state) => state.subscribeToMqtt);
   const start = useLiveSetStore((state) => state.start);
-  const render = useLiveSetStore((state) => state.render);
   const engine = useLiveSetStore((state) => state.engine);
   const tracks = useLiveSetStore((state) => state.tracks);
   const selectedTrackId = useLiveSetStore((state) => state.selectedTrackId);
@@ -44,7 +43,6 @@ function SoundCheck() {
         ?.map((i) => {
           engine.noteOn(i.midiChannel, note, velocity);
         });
-      render();
     }
   };
 
@@ -55,7 +53,6 @@ function SoundCheck() {
         ?.map((i) => {
           engine.noteOff(i.midiChannel, note, velocity);
         });
-      render();
     }
   };
 

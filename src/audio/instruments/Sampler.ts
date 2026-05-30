@@ -61,9 +61,9 @@ class Sampler extends Base {
   }
 
   noteOff(note: number, velocity: number = 0) {
-    const voice = this.voices.find((v) => v.note == note);
+    const voice = this.findVoiceForNote(this.voices, note);
     if (voice) {
-      voice.gate = 0;
+      this.releaseVoice(voice);
     }
   }
 

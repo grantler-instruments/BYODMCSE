@@ -8,6 +8,17 @@ abstract class Base {
     this.id = id;
   }
 
+  protected findVoiceForNote(voices: any[], note: number) {
+    return voices.find((v) => v.note === note || v.pendingNote === note);
+  }
+
+  protected releaseVoice(voice: any) {
+    voice.gate = 0;
+    voice.pendingTrigger = false;
+    delete voice.pendingNote;
+    delete voice.pendingVelocity;
+  }
+
   abstract noteOn(note: number, velocity: number): void;
   abstract noteOff(note: number, velocity: number): void;
   abstract render(): ElemNode;

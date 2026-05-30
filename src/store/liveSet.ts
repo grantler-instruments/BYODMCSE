@@ -33,6 +33,12 @@ interface State {
 let ctx: AudioContext;
 const core = new WebRenderer();
 let mqttClient: any;
+let renderChain = Promise.resolve();
+
+async function commitRender(engine: Engine) {
+  const mainOut = engine.render();
+  await core.render(mainOut, mainOut);
+}
 
 function getBrokerUrl(config: any): string {
   const fromEnv = import.meta.env.VITE_MQTT_BROKER_URL;
@@ -96,8 +102,9 @@ const useLiveSetStore = create<State>()(
             }
 
             core.updateVirtualFileSystem(files);
-            const engine = new Engine(config);
+            const engine = new Engine(config, core);
             set({ engine, loading: false });
+            await commitRender(engine);
           });
           const node = await core.initialize(ctx, {
             numberOfInputs: 0,
@@ -108,8 +115,13 @@ const useLiveSetStore = create<State>()(
         },
         render() {
           const engine = get().engine;
-          const mainOut = engine?.render();
-          core?.render(mainOut, mainOut);
+          if (!engine) return;
+
+          renderChain = renderChain
+            .then(() => commitRender(engine))
+            .catch((error) => {
+              console.error("Audio render failed:", error);
+            });
         },
         toggleArmedTrack(id: string) {
           const { armedTracks } = get();
@@ -202,8 +214,8 @@ const useLiveSetStore = create<State>()(
                         }
                       }
                     }
-                  }
-                  if (payload.status === 144) {
+                    render();
+                  } else if (payload.status === 144) {
                     console.log("got note on");
                     engine?.noteOn(
                       payload.channel,
@@ -216,7 +228,6 @@ const useLiveSetStore = create<State>()(
                   break;
                 }
               }
-              render();
             } catch (error) {
               console.log("error", error);
             }
@@ -245,19 +256,11 @@ const useLiveSetStore = create<State>()(
               input.channels.forEach((channel, index) => {
                 channel.addListener("noteon", (e) => {
                   const engine = get().engine;
-                  const render = get().render;
-                  engine.noteOn(channel.number, e.note.number, e.data[2]);
-                  if (engine) {
-                    render();
-                  }
+                  engine?.noteOn(channel.number, e.note.number, e.data[2]);
                 });
                 channel.addListener("noteoff", (e) => {
                   const engine = get().engine;
-                  const render = get().render;
-                  engine.noteOff(channel.number, e.note.number);
-                  if (engine) {
-                    render();
-                  }
+                  engine?.noteOff(channel.number, e.note.number);
                 });
                 channel.addListener("controlchange", (e) => {
                   const engine = get().engine;

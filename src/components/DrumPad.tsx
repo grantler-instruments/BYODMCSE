@@ -87,8 +87,7 @@ const DrumPad = ({ onKeyPressed, onKeyReleased, config }: Props) => {
         <Grid container spacing={2}>
           {pads.map((_, index) => (
             <Grid
-              item
-              xs={3}
+              size={{ xs: 3 }}
               key={index}
               sx={{
                 height: 100,

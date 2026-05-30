@@ -19,7 +19,7 @@ interface Config {
 
 class Engine {
   channels: any
-  constructor(config: Config) {
+  constructor(config: Config, core: any) {
     this.channels = {};
     config.tracks.forEach((track: any) => {
       const {midiChannel, instrument, effects, midiEffects} = track
@@ -49,7 +49,7 @@ class Engine {
       switch(instrument?.type){
         case "synth": {
           this.channels[midiChannel].push({
-            instrument: new Synth(instrument.id),
+            instrument: new Synth(instrument.id, core),
             effects: effectsRack,
           });
           break;
@@ -58,7 +58,8 @@ class Engine {
           this.channels[midiChannel].push({
             instrument: new DrumRack(
               instrument.id,
-              instrument.config
+              instrument.config,
+              core
             ),
             effects: effectsRack,
           })
@@ -68,7 +69,8 @@ class Engine {
           this.channels[midiChannel].push({
             instrument: new Simpler(
               instrument.id,
-              instrument.config
+              instrument.config,
+              core
             ),
             effects: effectsRack,
           })
@@ -105,6 +107,7 @@ class Engine {
   noteOff(channel: number, note: number, velocity: number = 0) {
     this.channels[channel]?.forEach((instrument: any) => instrument?.instrument?.noteOff(note, velocity))
   }
+
   render() {
     const signals = Object.values(this.channels).map((channel: any) => {
       const instrumentSignals = channel.map((entry: any) => {
@@ -117,7 +120,7 @@ class Engine {
       return el.add(...instrumentSignals);
     });
     const out = el.add(...signals);
-    return out;
+    return el.tanh(el.mul(out, 0.5));
   }
 }
 

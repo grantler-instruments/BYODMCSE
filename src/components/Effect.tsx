@@ -1,12 +1,4 @@
-import React, { useEffect, useState } from "react";
 import {
-  Box,
-  Container,
-  IconButton,
-  TextField,
-  Slider,
-  Paper,
-  Grid,
   List,
   ListItem,
 } from "@mui/material";
@@ -23,11 +15,11 @@ const Effect = ({ effect }: Props) => {
   }
   return (
     <Widget title={effect.name || effect.type}>
-      <List sx={{width: "100%"}}>
+      <List disablePadding sx={{ width: "100%" }}>
         {Object.entries(effect?.parameters)?.map(
           ([id, parameter]: any[]) => {
             return (
-              <ListItem key={id}>
+              <ListItem key={id} disablePadding sx={{ width: "100%" }}>
                 {<Parameter parameter={parameter}></Parameter>}
               </ListItem>
             );

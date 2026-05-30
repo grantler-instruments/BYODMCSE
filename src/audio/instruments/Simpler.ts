@@ -1,72 +1,121 @@
 import { el } from "@elemaudio/core";
 import { v4 } from "uuid";
 import Base from "./Base";
+import { createConstRef, createGateRef } from "../voiceRefs";
 
-class Simpler extends Base{
+class Simpler extends Base {
   sample: any;
-  voices: any[]
+  voices: any[];
   nextVoice: number;
-  constructor(id:string, config:any) {
-    super(id)
-    const {sample} = config;
+
+  constructor(id: string, config: any, core: any) {
+    super(id);
+    const { sample } = config;
     this.sample = sample;
 
-    this.voices = [
-      { gate: 0.0, note: 0, velocity: 0, key: `simpler-v1-${v4()}` },
-      { gate: 0.0, note: 0, velocity: 0, key: `simpler-v2-${v4()}` },
-      { gate: 0.0, note: 0, velocity: 0, key: `simpler-v3-${v4()}` },
-      { gate: 0.0, note: 0, velocity: 0, key: `simpler-v4-${v4()}` },
-      { gate: 0.0, note: 0, velocity: 0, key: `simpler-v5-${v4()}` },
-      { gate: 0.0, note: 0, velocity: 0, key: `simpler-v6-${v4()}` },
-      { gate: 0.0, note: 0, velocity: 0, key: `simpler-v7-${v4()}` },
-      { gate: 0.0, note: 0, velocity: 0, key: `simpler-v8-${v4()}` },
-      { gate: 0.0, note: 0, velocity: 0, key: `simpler-v9-${v4()}` },
-      { gate: 0.0, note: 0, velocity: 0, key: `simpler-v10-${v4()}` },
-    ];
+    this.voices = Array.from({ length: 10 }, (_, index) => {
+      const key = `simpler-v${index + 1}-${v4()}`;
+      const gate = createGateRef(core, key);
+      const pitch = createConstRef(core, `pitch-${key}`, 1);
+      const velocity = createConstRef(core, `velocity-${key}`, 0);
+
+      return {
+        gate: 0.0,
+        note: 0,
+        velocity: 0,
+        key,
+        gateNode: gate.node,
+        setGate: gate.setValue,
+        pitchNode: pitch.node,
+        setPitch: pitch.setValue,
+        velNode: velocity.node,
+        setVelocity: velocity.setValue,
+      };
+    });
     this.nextVoice = 0;
   }
 
   voice = (voice: any) => {
-    const gate = el.const({
-      key: `gate-${voice.key}`,
-      value: voice.gate,
-    });
-    const pitch = el.const({
-      key: `pitch-${voice.key}`,
-      value: Math.pow(2, (voice.note - 69) / 12),
-    });
-    const env = el.adsr(0.01, 0.1, 0.7, 0.2, gate); 
-    const sample = el.sample({ path: this.sample.path, mode: "gate" }, gate, pitch);
-    const out = el.mul(sample, env, voice.velocity);
-    return out;
+    const env = el.adsr(
+      { key: `env-${voice.key}` },
+      0.01,
+      0.1,
+      0.7,
+      0.2,
+      voice.gateNode
+    );
+    const sample = el.sample(
+      { path: this.sample.path, key: `sample-${voice.key}`, mode: "gate" },
+      voice.gateNode,
+      voice.pitchNode
+    );
+    return el.mul(sample, env, voice.velNode);
   };
 
+  private async activateVoice(
+    voice: any,
+    note: number,
+    normalizedVelocity: number
+  ) {
+    await voice.setPitch({ value: Math.pow(2, (note - 69) / 12) });
+    await voice.setVelocity({ value: normalizedVelocity });
+    voice.note = note;
+    voice.velocity = normalizedVelocity;
+  }
+
+  private async openGate(voice: any, retrigger: boolean) {
+    if (retrigger) {
+      await voice.setGate({ value: 0.0 });
+      voice.gate = 0.0;
+    }
+    await voice.setGate({ value: 1.0 });
+    voice.gate = 1.0;
+  }
+
   noteOn(note: number, velocity: number) {
+    void this.handleNoteOn(note, velocity);
+  }
+
+  private async handleNoteOn(note: number, velocity: number) {
+    const normalizedVelocity = velocity / 127;
     const voiceIndex = this.voices.findIndex((v) => v.note == note);
+    let voice: any;
+    let retrigger = false;
+
     if (voiceIndex >= 0) {
-      this.voices[voiceIndex].gate = 1.0;
-      this.voices[voiceIndex].note = note;
-      this.voices[voiceIndex].velocity = velocity / 127;
+      voice = this.voices[voiceIndex];
+      retrigger = voice.gate === 1.0;
     } else {
-      this.voices[this.nextVoice].gate = 1.0;
-      this.voices[this.nextVoice].note = note;
-      this.voices[this.nextVoice].velocity = velocity / 127;
+      voice = this.voices[this.nextVoice];
+      retrigger = voice.gate === 1.0;
     }
 
     this.nextVoice++;
     this.nextVoice = this.nextVoice % this.voices.length;
+
+    if (retrigger) {
+      this.releaseVoice(voice);
+    }
+
+    await this.activateVoice(voice, note, normalizedVelocity);
+    await this.openGate(voice, retrigger);
   }
 
   noteOff(note: number, velocity: number = 0) {
-    const voice = this.voices.find((v) => v.note == note);
-    if (voice) {
-      voice.gate = 0;
-    }
+    void this.handleNoteOff(note);
+  }
+
+  private async handleNoteOff(note: number) {
+    const voice = this.findVoiceForNote(this.voices, note);
+    if (!voice) return;
+
+    this.releaseVoice(voice);
+    await voice.setGate({ value: 0.0 });
   }
 
   render() {
     const out = el.add(...this.voices.map((v) => this.voice(v)));
-    return out
+    return out;
   }
 }
 

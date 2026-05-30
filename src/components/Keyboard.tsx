@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
   Container,
@@ -39,25 +39,41 @@ interface Props {
 const MusicalKeyboard = ({ onKeyPressed, onKeyReleased }: Props) => {
   const [octave, setOctave] = useState(0);
   const [velocity, setVelocity] = useState(100);
-  const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
+  const pressedKeysRef = useRef<Set<string>>(new Set());
+  const activeMouseNotesRef = useRef<Set<number>>(new Set());
+  const octaveRef = useRef(octave);
+  const velocityRef = useRef(velocity);
+
+  octaveRef.current = octave;
+  velocityRef.current = velocity;
+
+  const handleKeyPress = useCallback(
+    (note: number) => {
+      onKeyPressed?.(note + octaveRef.current * 12, velocityRef.current);
+    },
+    [onKeyPressed]
+  );
+
+  const handleKeyRelease = useCallback(
+    (note: number) => {
+      onKeyReleased?.(note + octaveRef.current * 12, velocityRef.current);
+    },
+    [onKeyReleased]
+  );
 
   useEffect(() => {
-    const handleKeyDown = (event: any) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       const keyObj = keys.find((key) => key.key === event.key);
-      if (keyObj && !pressedKeys.has(event.key)) {
-        setPressedKeys((prev) => new Set(prev).add(event.key));
+      if (keyObj && !pressedKeysRef.current.has(event.key)) {
+        pressedKeysRef.current.add(event.key);
         handleKeyPress(keyObj.midi);
       }
     };
 
-    const handleKeyUp = (event: any) => {
+    const handleKeyUp = (event: KeyboardEvent) => {
       const keyObj = keys.find((key) => key.key === event.key);
-      if (keyObj) {
-        setPressedKeys((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(event.key);
-          return newSet;
-        });
+      if (keyObj && pressedKeysRef.current.has(event.key)) {
+        pressedKeysRef.current.delete(event.key);
         handleKeyRelease(keyObj.midi);
       }
     };
@@ -69,51 +85,63 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased }: Props) => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [pressedKeys]);
+  }, [handleKeyPress, handleKeyRelease]);
 
-  const handleKeyPress = (note: number) => {
-    if (onKeyPressed) {
-      onKeyPressed(note + octave * 12, velocity);
-    }
+  useEffect(() => {
+    const handleWindowMouseUp = () => {
+      activeMouseNotesRef.current.forEach((note) => {
+        handleKeyRelease(note);
+      });
+      activeMouseNotesRef.current.clear();
+    };
+
+    window.addEventListener("mouseup", handleWindowMouseUp);
+    return () => window.removeEventListener("mouseup", handleWindowMouseUp);
+  }, [handleKeyRelease]);
+
+  const handleMouseDown = (note: number) => {
+    if (activeMouseNotesRef.current.has(note)) return;
+    activeMouseNotesRef.current.add(note);
+    handleKeyPress(note);
   };
 
-  const handleKeyRelease = (note: number) => {
-    if (onKeyReleased) {
-      onKeyReleased(note + octave * 12, velocity);
-    }
+  const handleMouseUp = (note: number) => {
+    if (!activeMouseNotesRef.current.has(note)) return;
+    activeMouseNotesRef.current.delete(note);
+    handleKeyRelease(note);
   };
 
   return (
     <Widget title="VKeyboard">
-      <Box display="flex" flexDirection={"column"} gap={3}>
-        <Box display="flex" gap={3} marginBottom={"12px"}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <Box sx={{ display: "flex", gap: 3, marginBottom: "12px" }}>
           <Box>
             <Grid container spacing={3}>
-              <Grid item xs={3}>
+              <Grid size={{ xs: 3 }}>
                 <IconButton onClick={() => setOctave(octave - 1)}>
                   <ChevronLeft></ChevronLeft>
                 </IconButton>
               </Grid>
-              <Grid item xs={6}>
+              <Grid size={{ xs: 6 }}>
                 <TextField
                   type="number"
                   value={octave}
                   onChange={(event: any) =>
                     setOctave(Number(event.target.value))
                   }
-                  inputProps={{ min: -2, max: 4, step: 1 }}
+                  slotProps={{ htmlInput: { min: -2, max: 4, step: 1 } }}
                 />
               </Grid>
-              <Grid item xs={3}>
+              <Grid size={{ xs: 3 }}>
                 <IconButton onClick={() => setOctave(octave + 1)}>
                   <ChevronRight></ChevronRight>
                 </IconButton>
               </Grid>
             </Grid>
           </Box>
-          <Box flex={1}>
-            <Grid container spacing={3} width={"100%"}>
-              <Grid item xs={9}>
+          <Box sx={{ flex: 1 }}>
+            <Grid container spacing={3} sx={{ width: "100%" }}>
+              <Grid size={{ xs: 9 }}>
                 <Slider
                   value={velocity}
                   onChange={(event: any) => setVelocity(event.target.value)}
@@ -122,24 +150,26 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased }: Props) => {
                   step={1}
                 />
               </Grid>
-              <Grid item xs={3}>
+              <Grid size={{ xs: 3 }}>
                 <TextField
                   type="number"
                   value={velocity}
                   onChange={(event: any) =>
                     setVelocity(Number(event.target.value))
                   }
-                  inputProps={{ min: 0, max: 127, step: 1 }}
+                  slotProps={{ htmlInput: { min: 0, max: 127, step: 1 } }}
                 />
               </Grid>
             </Grid>
           </Box>
         </Box>
         <Box
-          display="flex"
-          alignItems="center"
-          position="relative"
-          height={150}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            position: "relative",
+            height: 150,
+          }}
         >
           {keys.map((key, index) => {
             const isBlackKey = key.color === "black";
@@ -172,8 +202,8 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased }: Props) => {
                   color: isBlackKey ? "white" : "black",
                   fontSize: "12px",
                 }}
-                onMouseDown={() => handleKeyPress(key.midi)}
-                onMouseUp={() => handleKeyRelease(key.midi)}
+                onMouseDown={() => handleMouseDown(key.midi)}
+                onMouseUp={() => handleMouseUp(key.midi)}
               >
                 {key.note}
               </Box>

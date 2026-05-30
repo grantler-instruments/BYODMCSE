@@ -18,7 +18,7 @@ function TrackDetails({children}:Props) {
   const selectedTrack = tracks.find(track => track.id === selectedTrackId)
   const instrument = selectedTrack?.instrument
   return (
-    <Box sx={{height: "400px", overflowX: "auto", overflowY: "hidden"}} display={"flex"} gap={3}>
+    <Box sx={{ height: "400px", overflowX: "auto", overflowY: "hidden", display: "flex", gap: 3 }}>
       {children}
       {instrument && <Instrument instrument={instrument}></Instrument>}
       {selectedTrack?.effects.map((effect: any) =>{

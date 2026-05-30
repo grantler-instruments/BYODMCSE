@@ -2,7 +2,7 @@ import {
   Slider,
   Select,
   MenuItem,
-  Grid,
+  Box,
   Typography,
   Checkbox,
 } from "@mui/material";
@@ -14,18 +14,35 @@ interface Props {
 
 const Parameter = ({ parameter }: Props) => {
   const setParameterValue = useLiveSetStore((state) => state.setParameterValue);
+  const render = useLiveSetStore((state) => state.render);
   const { value, options, name } = parameter;
   return (
-    <Grid container>
-      <Grid item xs={3}>
-        <Typography>{name}</Typography>
-      </Grid>
-      <Grid item xs={9}>
+    <Box
+      sx={{
+        display: "flex",
+        width: "100%",
+        alignItems: "center",
+        gap: 2,
+        py: 0.5,
+      }}
+    >
+      <Typography
+        sx={{
+          flex: "0 0 35%",
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {name}
+      </Typography>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
         {typeof value === "boolean" && (
           <Checkbox
             checked={value}
             onChange={(event: any) => {
               setParameterValue(parameter.id, !value);
+              render();
             }}
           ></Checkbox>
         )}
@@ -35,8 +52,10 @@ const Parameter = ({ parameter }: Props) => {
             min={options?.min || 0}
             max={options?.max || 1}
             step={0.001}
+            sx={{ width: "100%" }}
             onChange={(event: any) => {
               setParameterValue(parameter.id, event.target.value);
+              render();
             }}
           />
         )}
@@ -48,6 +67,7 @@ const Parameter = ({ parameter }: Props) => {
             size="small"
             onChange={(event) => {
               setParameterValue(parameter.id, event.target.value);
+              render();
             }}
           >
             {options?.map((option: any, index: number) => (
@@ -57,8 +77,8 @@ const Parameter = ({ parameter }: Props) => {
             ))}
           </Select>
         )}
-      </Grid>
-    </Grid>
+      </Box>
+    </Box>
   );
 
   return <pre>{JSON.stringify(parameter, null, 4)}</pre>;

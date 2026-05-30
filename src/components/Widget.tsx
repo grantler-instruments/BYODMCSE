@@ -27,10 +27,10 @@ function Widget({ children, title, size, focused }: Props) {
         borderRadius: "24px",
         padding: "12px",
         overflow: "auto",
+        display: "flex",
+        gap: 2,
+        flexDirection: "column",
       }}
-      display={"flex"}
-      gap={2}
-      flexDirection="column"
     >
       <Typography variant="h6" color="primary">
         {title}
