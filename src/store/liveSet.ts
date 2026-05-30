@@ -34,6 +34,24 @@ let ctx: AudioContext;
 const core = new WebRenderer();
 let mqttClient: any;
 
+function getBrokerUrl(config: any): string {
+  const fromEnv = import.meta.env.VITE_MQTT_BROKER_URL;
+  if (fromEnv) return fromEnv;
+
+  const connection = config?.connection;
+  if (import.meta.env.DEV && connection?.["broker.local"]) {
+    return connection["broker.local"];
+  }
+
+  const broker = connection?.broker;
+  if (broker) return broker;
+
+  console.warn(
+    "No MQTT broker configured. Set VITE_MQTT_BROKER_URL or connection.broker in config."
+  );
+  return "";
+}
+
 const useLiveSetStore = create<State>()(
   devtools(
     persist(
@@ -143,7 +161,10 @@ const useLiveSetStore = create<State>()(
           return null;
         },
         subscribeToMqtt(roomId: string) {
-          mqttClient = mqtt.connect(config.connection.broker);
+          const brokerUrl = getBrokerUrl(get().config);
+          if (!brokerUrl) return;
+
+          mqttClient = mqtt.connect(brokerUrl);
           mqttClient.on("connect", function () {
             mqttClient.subscribe(`byod/${roomId}`, function (err: any) {
               if (err) {

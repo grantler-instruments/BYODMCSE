@@ -1,6 +1,6 @@
 {
   "connection": {
-    "broker": "wss://byodmcse:aFyYJo7b6rKnORki@byodmcse.cloud.shiftr.io:443",
+    "broker": "",
     "broker.local": "ws://localhost:9001"
   },
   "tracks": [
