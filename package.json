@@ -15,6 +15,7 @@
     "@elemaudio/web-renderer": "^3.2.3",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@grantler-instruments/mqtt-midi": "^0.1.0",
     "@mui/icons-material": "^9.0.1",
     "@mui/material": "^9.0.1",
     "@nick-thompson/drumsynth": "^0.4.0",

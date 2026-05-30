@@ -78,7 +78,7 @@ class Engine {
         }
         case "noise": {
           this.channels[midiChannel].push({
-            instrument: new Noise(instrument.id),
+            instrument: new Noise(instrument.id, core),
             effects: effectsRack,
         })
           break;
@@ -92,7 +92,7 @@ class Engine {
         }
         case "tapeNoise": {
           this.channels[midiChannel].push({
-            instrument: new TapeNoise(instrument.id),
+            instrument: new TapeNoise(instrument.id, core),
             effects: effectsRack,
           });
           break;

@@ -18,8 +18,9 @@ Without a `.env` file, local dev falls back to `connection.broker.local` in the 
 
 ## Routes
 
-- `/` — SoundCheck: local testing with on-screen keyboard and track controls
-- `/rooms/:roomId` — audience view for a live session (subscribes to `byod/<roomId>` over MQTT)
+- `/` — SoundCheck: local testing with on-screen keyboard and track controls (MQTT room: `demo`)
+- `/rooms/demo` — audience view for local testing (same MQTT room as SoundCheck)
+- `/rooms/:roomId` — audience view for a live session (subscribes to `byod/<roomId>/out/...` over MQTT via [@grantler-instruments/mqtt-midi](https://www.npmjs.com/package/@grantler-instruments/mqtt-midi))
 
 ## Configuration
 
@@ -58,9 +59,11 @@ For production builds, add `VITE_MQTT_BROKER_URL` as a GitHub Actions secret so 
 
 ## MIDI over MQTT
 
+MIDI is sent and received via [@grantler-instruments/mqtt-midi](https://www.npmjs.com/package/@grantler-instruments/mqtt-midi). Each room uses the topic prefix `byod/<roomId>` — e.g. for the demo room, note-ons arrive on `byod/demo/out/noteon/1/60` with a 1-byte velocity payload.
+
 To send MIDI from a DAW to browser clients:
 
 1. Run an MQTT broker (local or hosted).
-2. Start [ofMIDI2MQTT](https://github.com/thomasgeissl/ofMIDI2MQTT) pointed at your broker.
-3. Route DAW output to the MIDI port configured in ofMIDI2MQTT.
-4. Set `VITE_MQTT_BROKER_URL` and open a room at `/rooms/<roomId>`.
+2. Start a MIDI→MQTT bridge (e.g. [ofMIDI2MQTT](https://github.com/thomasgeissl/ofMIDI2MQTT)) pointed at your broker, publishing to `byod/<roomId>/out/...`.
+3. Route DAW output to the MIDI port configured in the bridge.
+4. Set `VITE_MQTT_BROKER_URL` and open [http://localhost:5173/#/rooms/demo](http://localhost:5173/#/rooms/demo) (or SoundCheck at `/`).

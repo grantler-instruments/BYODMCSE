@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, devtools, persist } from "zustand/middleware";
 import WebRenderer from "@elemaudio/web-renderer";
 import { WebMidi } from "webmidi";
-import mqtt from "mqtt";
+import { MqttMidi } from "@grantler-instruments/mqtt-midi";
 import config from "../assets/config.json";
 import axios from "axios";
 import { loadSample, map } from "../audio/utils";
@@ -32,8 +32,24 @@ interface State {
 
 let ctx: AudioContext;
 const core = new WebRenderer();
-let mqttClient: any;
+let mqttMidi: MqttMidi | null = null;
 let renderChain = Promise.resolve();
+
+function findParameterById(tracks: any[], parameterId: string) {
+  for (const track of tracks) {
+    for (const key of Object.keys(track?.instrument?.parameters ?? {})) {
+      const param = track.instrument.parameters[key];
+      if (param?.id === parameterId) return param;
+    }
+    for (const effect of track.effects ?? []) {
+      for (const key of Object.keys(effect.parameters ?? {})) {
+        const param = effect.parameters[key];
+        if (param?.id === parameterId) return param;
+      }
+    }
+  }
+  return null;
+}
 
 async function commitRender(engine: Engine) {
   const mainOut = engine.render();
@@ -176,62 +192,68 @@ const useLiveSetStore = create<State>()(
           const brokerUrl = getBrokerUrl(get().config);
           if (!brokerUrl) return;
 
-          mqttClient = mqtt.connect(brokerUrl);
-          mqttClient.on("connect", function () {
-            mqttClient.subscribe(`byod/${roomId}`, function (err: any) {
-              if (err) {
-                console.error(err);
+          void (async () => {
+            if (mqttMidi) {
+              await mqttMidi.disconnect();
+              mqttMidi = null;
+            }
+
+            const client = new MqttMidi({
+              url: brokerUrl,
+              prefix: `byod/${roomId}`,
+            });
+
+            client.on("noteOn", ({ channel, note, velocity }) => {
+              const engine = get().engine;
+              if (velocity === 0) {
+                engine?.noteOff(channel, note);
+              } else {
+                engine?.noteOn(channel, note, velocity);
               }
             });
-          });
 
-          mqttClient.on("message", function (topic: string, message: any) {
-            const engine = get().engine;
-            const render = get().render;
-            const mappings = get().mappings
-            try {
-              const payload = JSON.parse(message.toString());
-              switch (topic) {
-                case `byod/${roomId}`: {
-                  if (payload.status === 176) {
-                    //CC
-                    console.log("got cc")
-                    const { channel, control, value } = payload;
-                    const destination = mappings[`${channel}, ${control}`];
-                    if (destination) {
-                      const parameter = get().getParameter(destination.parameter)
-                      if(parameter){
-                        console.log(parameter)
-                        switch(typeof parameter.value){
-                          case "number": {
-                            get().setParameterValue(destination.parameter, map(value, 0, 127, parameter.options?.min, parameter.options?.max))
-                            break;
-                          }
-                          case "boolean": {
-                            get().setParameterValue(destination.parameter, value > 0)
-                            break;
-                          }
-                        }
-                      }
-                    }
-                    render();
-                  } else if (payload.status === 144) {
-                    console.log("got note on");
-                    engine?.noteOn(
-                      payload.channel,
-                      payload.note,
-                      payload.velocity
-                    );
-                  } else if (payload.status === 128) {
-                    engine?.noteOff(payload.channel, payload.note);
-                  }
-                  break;
-                }
+            client.on("noteOff", ({ channel, note }) => {
+              get().engine?.noteOff(channel, note);
+            });
+
+            client.on("controlChange", ({ channel, controller, value }) => {
+              const destination = get().mappings[`${channel},${controller}`];
+              if (!destination) return;
+
+              const parameter = findParameterById(
+                get().tracks,
+                destination.parameter
+              );
+              if (!parameter) return;
+
+              if (typeof parameter.value === "number") {
+                get().setParameterValue(
+                  destination.parameter,
+                  map(
+                    value,
+                    0,
+                    127,
+                    parameter.options?.min,
+                    parameter.options?.max
+                  )
+                );
+              } else if (typeof parameter.value === "boolean") {
+                get().setParameterValue(destination.parameter, value > 0);
               }
-            } catch (error) {
-              console.log("error", error);
+              get().render();
+            });
+
+            client.on("error", (err) => {
+              console.error("MQTT MIDI error:", err);
+            });
+
+            try {
+              await client.connect();
+              mqttMidi = client;
+            } catch (err) {
+              console.error("MQTT MIDI connect failed:", err);
             }
-          });
+          })();
         },
         setSelectedTrackId: (selectedTrackId: string | null) => {
           set({ selectedTrackId });

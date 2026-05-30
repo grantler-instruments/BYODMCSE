@@ -26,7 +26,7 @@ function SoundCheck() {
   useEffect(() => {
     initOrchestra();
     listenToMidi();
-    subscribeToMqtt("soundcheck")
+    subscribeToMqtt("demo")
   }, [initOrchestra, listenToMidi, subscribeToMqtt]);
 
   const instruments = tracks.map((track) => track.instrument);

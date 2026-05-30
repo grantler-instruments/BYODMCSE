@@ -1,31 +1,38 @@
 import { el } from "@elemaudio/core";
-// import { default as core } from "@elemaudio/node-renderer";
-// import { dirname, resolve } from "path";
-// import { fileURLToPath } from "url";
-import { Interval, Note, Scale, Midi } from "tonal";
 import { v4 } from "uuid";
+import Base from "./Base";
+import { createGateRef } from "../voiceRefs";
 
-// https://www.youtube.com/watch?v=0voWrxLDnSE
-
-class Noise {
-  constructor(id) {
-    this.id = id;
-    this.gate = 0;
+class Noise extends Base {
+  constructor(id, core) {
+    super(id);
     this.key = `noise-v1-${v4()}`;
+    const gate = createGateRef(core, this.key);
+    this.gate = 0;
+    this.gateNode = gate.node;
+    this.setGate = gate.setValue;
   }
+
   noteOn(note, velocity) {
+    void this.handleNoteOn();
+  }
+
+  async handleNoteOn() {
+    await this.setGate({ value: 1.0 });
     this.gate = 1.0;
   }
-  noteOff(note) {
-    this.gate = 0;
+
+  noteOff(note, velocity = 0) {
+    void this.handleNoteOff();
   }
+
+  async handleNoteOff() {
+    await this.setGate({ value: 0.0 });
+    this.gate = 0.0;
+  }
+
   render() {
-    const gate = el.const({
-      key: `gate-${this.key}`,
-      value: this.gate,
-    });
-    return el.mul(gate, el.noise());
-    // return el.noise()
+    return el.mul(this.gateNode, el.noise({ key: `noise-${this.key}` }));
   }
 }
 
