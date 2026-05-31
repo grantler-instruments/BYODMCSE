@@ -43,13 +43,13 @@ function Room() {
   };
 
   return (
-    <Box flex={1} display="flex" flexDirection="column">
+    <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
       {!engine && (
         <>
           <Instructions>
             Please increase your volume to the max and enter the room
           </Instructions>
-          <Box flex={1}></Box>
+          <Box sx={{ flex: 1 }}></Box>
           <Button
             onClick={init}
             variant={"outlined"}

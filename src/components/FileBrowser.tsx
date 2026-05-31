@@ -1,48 +1,99 @@
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import {
   Box,
-  Container,
   IconButton,
-  TextField,
-  Slider,
-  Paper,
-  Grid,
   List,
   ListItem,
+  ListItemText,
+  Stack,
+  Typography,
   useTheme,
-  Tooltip,
 } from "@mui/material";
-import Parameter from "./Parameter.";
-import Widget from "./Widget";
-import { el } from "@elemaudio/core";
+import CloseIcon from "@mui/icons-material/Close";
 import useLiveSetStore from "../store/liveSet";
 import { useDropzone } from "react-dropzone";
 
-interface Props {}
+interface Props {
+  onClose?: () => void;
+}
 
-const FileBrowser = (props: Props) => {
-    const theme = useTheme()
+const FileBrowser = ({ onClose }: Props) => {
+  const theme = useTheme();
   const files = useLiveSetStore((state) => state.config.files);
-  const onDrop = useCallback((acceptedFiles: any[]) => {
+  const onDrop = useCallback((acceptedFiles: File[]) => {
     console.log(acceptedFiles);
   }, []);
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+  const fileEntries = Object.entries(files);
 
   return (
-    <Widget title="File Browser" size="large">
-      <Box {...getRootProps()} textAlign={"center"} sx={{padding: "24px", border: `1px dashed ${theme.palette.primary.main}`}}>
-        <input {...getInputProps()} />
-        {isDragActive ? (
-          <p>Drop the files here ...</p>
-        ) : (
-          <p>Drag 'n' drop some files here, or click to select files</p>
+    <Box
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        p: 2.5,
+        gap: 2,
+      }}
+    >
+      <Stack
+        direction="row"
+        sx={{ alignItems: "center", justifyContent: "space-between" }}
+      >
+        <Typography variant="h6" color="primary">
+          Files
+        </Typography>
+        {onClose && (
+          <IconButton aria-label="Close file browser" onClick={onClose} edge="end">
+            <CloseIcon />
+          </IconButton>
         )}
+      </Stack>
+
+      <Box
+        {...getRootProps()}
+        sx={{
+          p: 3,
+          textAlign: "center",
+          borderRadius: 2,
+          border: `1px dashed ${theme.palette.primary.main}`,
+          bgcolor: "rgba(255, 255, 255, 0.03)",
+          cursor: "pointer",
+          transition: "background-color 0.2s",
+          ...(isDragActive && {
+            bgcolor: "rgba(42, 157, 143, 0.12)",
+          }),
+        }}
+      >
+        <input {...getInputProps()} />
+        <Typography variant="body2" color="text.secondary">
+          {isDragActive
+            ? "Drop files here…"
+            : "Drag and drop files, or click to browse"}
+        </Typography>
       </Box>
-      {Object.entries(files).map(([key, path]: any, index: number) => {
-        return <Box key={index}><Tooltip title={path}><span>{key}</span></Tooltip></Box>;
-      })}
-      {/* <pre>{JSON.stringify(files, null, 4)}</pre> */}
-    </Widget>
+
+      {fileEntries.length > 0 ? (
+        <List dense disablePadding sx={{ overflow: "auto", flex: 1 }}>
+          {fileEntries.map(([key, path], index) => (
+            <ListItem key={index} disablePadding sx={{ py: 0.75 }}>
+              <ListItemText
+                primary={key}
+                secondary={path as string}
+                slotProps={{
+                  primary: { variant: "body2" },
+                  secondary: { variant: "caption", noWrap: true },
+                }}
+              />
+            </ListItem>
+          ))}
+        </List>
+      ) : (
+        <Typography variant="body2" color="text.secondary">
+          No files loaded yet.
+        </Typography>
+      )}
+    </Box>
   );
 };
 

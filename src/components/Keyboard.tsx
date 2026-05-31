@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
-  Container,
   IconButton,
   TextField,
   Slider,
-  Paper,
   Grid,
 } from "@mui/material";
 import { ChevronLeft, ChevronRight } from "@mui/icons-material";
@@ -31,12 +29,26 @@ const whiteKeyWidth = 40;
 const blackKeyWidth = 30;
 const blackKeyOffset = whiteKeyWidth - blackKeyWidth / 2;
 
+const compactWhiteKeyWidth = 24;
+const compactBlackKeyWidth = 16;
+const compactBlackKeyOffset =
+  compactWhiteKeyWidth - compactBlackKeyWidth / 2;
+const compactWhiteKeyHeight = 56;
+const compactBlackKeyHeight = 36;
+
 interface Props {
   onKeyPressed: (note: number, velocity: number) => void;
   onKeyReleased: (note: number, velocity: number) => void;
+  compact?: boolean;
 }
 
-const MusicalKeyboard = ({ onKeyPressed, onKeyReleased }: Props) => {
+const isTypingTarget = (target: EventTarget | null) =>
+  target instanceof HTMLInputElement ||
+  target instanceof HTMLTextAreaElement ||
+  target instanceof HTMLSelectElement ||
+  (target instanceof HTMLElement && target.isContentEditable);
+
+const MusicalKeyboard = ({ onKeyPressed, onKeyReleased, compact = false }: Props) => {
   const [octave, setOctave] = useState(0);
   const [velocity, setVelocity] = useState(100);
   const pressedKeysRef = useRef<Set<string>>(new Set());
@@ -63,6 +75,7 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased }: Props) => {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return;
       const keyObj = keys.find((key) => key.key === event.key);
       if (keyObj && !pressedKeysRef.current.has(event.key)) {
         pressedKeysRef.current.add(event.key);
@@ -71,6 +84,7 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased }: Props) => {
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return;
       const keyObj = keys.find((key) => key.key === event.key);
       if (keyObj && pressedKeysRef.current.has(event.key)) {
         pressedKeysRef.current.delete(event.key);
@@ -111,6 +125,161 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased }: Props) => {
     handleKeyRelease(note);
   };
 
+  const keyLayout = compact
+    ? {
+        whiteKeyWidth: compactWhiteKeyWidth,
+        blackKeyWidth: compactBlackKeyWidth,
+        blackKeyOffset: compactBlackKeyOffset,
+        whiteKeyHeight: compactWhiteKeyHeight,
+        blackKeyHeight: compactBlackKeyHeight,
+        keyboardHeight: compactWhiteKeyHeight,
+        fontSize: "9px",
+      }
+    : {
+        whiteKeyWidth,
+        blackKeyWidth,
+        blackKeyOffset,
+        whiteKeyHeight: 150,
+        blackKeyHeight: 100,
+        keyboardHeight: 150,
+        fontSize: "12px",
+      };
+
+  const controls = (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: compact ? 1.5 : 3,
+        flexShrink: 0,
+        ...(compact ? { minWidth: 220 } : { marginBottom: "12px" }),
+      }}
+    >
+      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+        <IconButton size="small" onClick={() => setOctave(octave - 1)}>
+          <ChevronLeft fontSize="small" />
+        </IconButton>
+        <TextField
+          type="number"
+          size="small"
+          value={octave}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+            setOctave(Number(event.target.value))
+          }
+          slotProps={{
+            htmlInput: { min: -2, max: 4, step: 1 },
+            input: { sx: { width: compact ? 40 : 56, py: 0.5 } },
+          }}
+        />
+        <IconButton size="small" onClick={() => setOctave(octave + 1)}>
+          <ChevronRight fontSize="small" />
+        </IconButton>
+      </Box>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          flex: compact ? 1 : undefined,
+          minWidth: compact ? 120 : undefined,
+        }}
+      >
+        <Slider
+          size="small"
+          value={velocity}
+          onChange={(_event, value) => setVelocity(value as number)}
+          min={0}
+          max={127}
+          step={1}
+          sx={{ flex: 1, minWidth: compact ? 72 : 120 }}
+        />
+        <TextField
+          type="number"
+          size="small"
+          value={velocity}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+            setVelocity(Number(event.target.value))
+          }
+          slotProps={{
+            htmlInput: { min: 0, max: 127, step: 1 },
+            input: { sx: { width: compact ? 44 : 56, py: 0.5 } },
+          }}
+        />
+      </Box>
+    </Box>
+  );
+
+  const keyboard = (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        position: "relative",
+        height: keyLayout.keyboardHeight,
+        minWidth: keys.filter((k) => k.color === "white").length * keyLayout.whiteKeyWidth,
+        flex: compact ? 1 : undefined,
+        overflowX: compact ? "auto" : undefined,
+      }}
+    >
+      {keys.map((key, index) => {
+        const isBlackKey = key.color === "black";
+        const whiteKeyOffset =
+          keys.slice(0, index).filter((k) => k.color === "white").length *
+          keyLayout.whiteKeyWidth;
+
+        const offset = isBlackKey
+          ? whiteKeyOffset - keyLayout.blackKeyOffset
+          : whiteKeyOffset;
+
+        return (
+          <Box
+            key={index}
+            sx={{
+              width: isBlackKey ? keyLayout.blackKeyWidth : keyLayout.whiteKeyWidth,
+              height: isBlackKey ? keyLayout.blackKeyHeight : keyLayout.whiteKeyHeight,
+              backgroundColor: key.color,
+              margin: "1px",
+              zIndex: isBlackKey ? 2 : 1,
+              position: "absolute",
+              left: offset,
+              top: 0,
+              cursor: "pointer",
+              border: "1px solid #000",
+              boxSizing: "border-box",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              color: isBlackKey ? "white" : "black",
+              fontSize: keyLayout.fontSize,
+              flexShrink: 0,
+            }}
+            onMouseDown={() => handleMouseDown(key.midi)}
+            onMouseUp={() => handleMouseUp(key.midi)}
+          >
+            {!compact && key.note}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+
+  if (compact) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+          width: "100%",
+          minHeight: keyLayout.keyboardHeight,
+        }}
+      >
+        {controls}
+        {keyboard}
+      </Box>
+    );
+  }
+
   return (
     <Widget title="VKeyboard">
       <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -126,7 +295,7 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased }: Props) => {
                 <TextField
                   type="number"
                   value={octave}
-                  onChange={(event: any) =>
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                     setOctave(Number(event.target.value))
                   }
                   slotProps={{ htmlInput: { min: -2, max: 4, step: 1 } }}
@@ -144,7 +313,7 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased }: Props) => {
               <Grid size={{ xs: 9 }}>
                 <Slider
                   value={velocity}
-                  onChange={(event: any) => setVelocity(event.target.value)}
+                  onChange={(_event, value) => setVelocity(value as number)}
                   min={0}
                   max={127}
                   step={1}
@@ -154,7 +323,7 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased }: Props) => {
                 <TextField
                   type="number"
                   value={velocity}
-                  onChange={(event: any) =>
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                     setVelocity(Number(event.target.value))
                   }
                   slotProps={{ htmlInput: { min: 0, max: 127, step: 1 } }}
@@ -163,53 +332,7 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased }: Props) => {
             </Grid>
           </Box>
         </Box>
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            position: "relative",
-            height: 150,
-          }}
-        >
-          {keys.map((key, index) => {
-            const isBlackKey = key.color === "black";
-            const whiteKeyOffset =
-              keys.slice(0, index).filter((k) => k.color === "white").length *
-              whiteKeyWidth;
-
-            const offset = isBlackKey
-              ? whiteKeyOffset - blackKeyOffset
-              : whiteKeyOffset;
-
-            return (
-              <Box
-                key={index}
-                sx={{
-                  width: isBlackKey ? blackKeyWidth : whiteKeyWidth,
-                  height: isBlackKey ? 100 : 150,
-                  backgroundColor: key.color,
-                  margin: "2px",
-                  zIndex: isBlackKey ? 2 : 1,
-                  position: "absolute",
-                  left: offset,
-                  top: 0,
-                  cursor: "pointer",
-                  border: "1px solid #000",
-                  boxSizing: "border-box",
-                  display: "flex",
-                  alignItems: "flex-end",
-                  justifyContent: "center",
-                  color: isBlackKey ? "white" : "black",
-                  fontSize: "12px",
-                }}
-                onMouseDown={() => handleMouseDown(key.midi)}
-                onMouseUp={() => handleMouseUp(key.midi)}
-              >
-                {key.note}
-              </Box>
-            );
-          })}
-        </Box>
+        {keyboard}
       </Box>
     </Widget>
   );

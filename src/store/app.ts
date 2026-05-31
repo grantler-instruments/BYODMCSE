@@ -7,9 +7,13 @@ interface State {
   uuid: string;
   users: any[];
   showFileBrowser: boolean;
+  showVirtualKeyboard: boolean;
   addUser: (uuid: string) => void;
   removeUser: (uuid: string) => void;
   toggleShowFileBrowser: () => void;
+  setShowFileBrowser: (show: boolean) => void;
+  toggleShowVirtualKeyboard: () => void;
+  setShowVirtualKeyboard: (show: boolean) => void;
 }
 
 const useAppStore = create<State>()(
@@ -19,6 +23,7 @@ const useAppStore = create<State>()(
         uuid: v4(),
         users: [],
         showFileBrowser: false,
+        showVirtualKeyboard: false,
         // Add a new user to the list of users
         addUser: (uuid: string) => {
           const users = get().users
@@ -34,9 +39,18 @@ const useAppStore = create<State>()(
             users: users.filter((item:any) => item.uuid !== uuid),
           });
         },
-        toggleShowFileBrowser: ()=>{
-          set({showFileBrowser: !get().showFileBrowser})
-        }
+        toggleShowFileBrowser: () => {
+          set({ showFileBrowser: !get().showFileBrowser });
+        },
+        setShowFileBrowser: (show: boolean) => {
+          set({ showFileBrowser: show });
+        },
+        toggleShowVirtualKeyboard: () => {
+          set({ showVirtualKeyboard: !get().showVirtualKeyboard });
+        },
+        setShowVirtualKeyboard: (show: boolean) => {
+          set({ showVirtualKeyboard: show });
+        },
       }),
       {
         name: "app",

@@ -6,10 +6,11 @@ import {
   type ParameterSetter,
 } from "../effectRefs";
 
-class Distortion extends Base {
+class Tremolo extends Base {
   private dryRef: ReturnType<typeof createEffectParamRef>;
   private wetRef: ReturnType<typeof createEffectParamRef>;
-  private driveRef: ReturnType<typeof createEffectParamRef>;
+  private rateRef: ReturnType<typeof createEffectParamRef>;
+  private depthRef: ReturnType<typeof createEffectParamRef>;
   private mix = 0.5;
   private active = true;
 
@@ -17,23 +18,27 @@ class Distortion extends Base {
     super(id);
     this.mix = parameters.mix?.value ?? 0.5;
     this.active = parameters.active?.value ?? true;
-    const drive = parameters.drive?.value ?? 1;
 
     const effectiveMix = this.active ? this.mix : 0;
     this.dryRef = createEffectParamRef(
       core,
-      `distortion-${id}-dry`,
+      `tremolo-${id}-dry`,
       1 - effectiveMix
     );
     this.wetRef = createEffectParamRef(
       core,
-      `distortion-${id}-wet`,
+      `tremolo-${id}-wet`,
       effectiveMix
     );
-    this.driveRef = createEffectParamRef(
+    this.rateRef = createEffectParamRef(
       core,
-      `distortion-${id}-drive`,
-      drive
+      `tremolo-${id}-rate`,
+      parameters.rate?.value ?? 4.5
+    );
+    this.depthRef = createEffectParamRef(
+      core,
+      `tremolo-${id}-depth`,
+      parameters.depth?.value ?? 0.3
     );
   }
 
@@ -52,8 +57,12 @@ class Distortion extends Base {
       await updateMix();
     });
 
-    registerEffectParameter(setters, parameters.drive, async (value) => {
-      await this.driveRef.setValue({ value });
+    registerEffectParameter(setters, parameters.rate, async (value) => {
+      await this.rateRef.setValue({ value });
+    });
+
+    registerEffectParameter(setters, parameters.depth, async (value) => {
+      await this.depthRef.setValue({ value });
     });
 
     registerEffectParameter(setters, parameters.active, async (value) => {
@@ -63,19 +72,24 @@ class Distortion extends Base {
   }
 
   render(signal: any) {
-    const drivenSignal = el.tanh(el.mul(signal, this.driveRef.node));
-
-    const warmedSignal = el.lowpass(
-      el.const({ key: `distortion-${this.id}-filter-freq`, value: 12000 }),
-      1.41,
-      drivenSignal
+    const lfo = el.cycle({ key: `tremolo-${this.id}-lfo` }, this.rateRef.node);
+    const trem = el.add(
+      el.const({ key: `tremolo-${this.id}-unity`, value: 1 }),
+      el.mul(
+        el.mul(
+          el.const({ key: `tremolo-${this.id}-half`, value: 0.5 }),
+          this.depthRef.node
+        ),
+        lfo
+      )
     );
+    const wetSignal = el.mul(signal, trem);
 
     return el.add(
       el.mul(this.dryRef.node, signal),
-      el.mul(this.wetRef.node, warmedSignal)
+      el.mul(this.wetRef.node, wetSignal)
     );
   }
 }
 
-export default Distortion;
+export default Tremolo;

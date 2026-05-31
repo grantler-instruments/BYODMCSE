@@ -4,7 +4,7 @@ import {
   MenuItem,
   Box,
   Typography,
-  Checkbox,
+  Switch,
 } from "@mui/material";
 import useLiveSetStore from "../store/liveSet";
 
@@ -14,7 +14,6 @@ interface Props {
 
 const Parameter = ({ parameter }: Props) => {
   const setParameterValue = useLiveSetStore((state) => state.setParameterValue);
-  const render = useLiveSetStore((state) => state.render);
   const { value, options, name } = parameter;
   return (
     <Box
@@ -38,13 +37,12 @@ const Parameter = ({ parameter }: Props) => {
       </Typography>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         {typeof value === "boolean" && (
-          <Checkbox
+          <Switch
             checked={value}
-            onChange={(event: any) => {
+            onChange={() => {
               setParameterValue(parameter.id, !value);
-              render();
             }}
-          ></Checkbox>
+          />
         )}
         {typeof value === "number" && (
           <Slider
@@ -55,7 +53,6 @@ const Parameter = ({ parameter }: Props) => {
             sx={{ width: "100%" }}
             onChange={(event: any) => {
               setParameterValue(parameter.id, event.target.value);
-              render();
             }}
           />
         )}
@@ -67,7 +64,6 @@ const Parameter = ({ parameter }: Props) => {
             size="small"
             onChange={(event) => {
               setParameterValue(parameter.id, event.target.value);
-              render();
             }}
           >
             {options?.map((option: any, index: number) => (

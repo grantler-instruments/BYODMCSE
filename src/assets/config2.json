@@ -114,6 +114,12 @@
               "name": "Mix",
               "value": 0.5,
               "options": {"min": 0, "max": 1}
+            },
+            "feedback": {
+              "id": "d0e1f2a3-b456-7890-cdef-123456789abc",
+              "name": "Feedback",
+              "value": 0.4,
+              "options": {"min": 0, "max": 0.95}
             }
           }
         },
@@ -135,6 +141,36 @@
             },
             "mix": {
               "id": "7d7783ed-a81f-4f36-828a-2f93d5085855",
+              "name": "Mix",
+              "value": 0.5,
+              "options": {"min": 0, "max": 1}
+            }
+          }
+        },
+        {
+          "id": "d7e8f9a0-b1c2-3456-7890-abcdef123456",
+          "type": "tremolo",
+          "name": "Tremolo",
+          "parameters": {
+            "active": {
+              "id": "e8f9a0b1-c2d3-4567-8901-bcdef1234567",
+              "name": "Active",
+              "value": true
+            },
+            "rate": {
+              "id": "f9a0b1c2-d3e4-5678-9012-cdef12345678",
+              "name": "Rate",
+              "value": 4.5,
+              "options": {"min": 0, "max": 12}
+            },
+            "depth": {
+              "id": "a0b1c2d3-e4f5-6789-0123-def123456789",
+              "name": "Depth",
+              "value": 0.3,
+              "options": {"min": 0, "max": 1}
+            },
+            "mix": {
+              "id": "b1c2d3e4-f5a6-7890-1234-ef1234567890",
               "name": "Mix",
               "value": 0.5,
               "options": {"min": 0, "max": 1}

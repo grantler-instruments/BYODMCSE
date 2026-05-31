@@ -17,7 +17,12 @@ const theme = createTheme({
     },
     background: {
       default: backgroundColor,
-    }
+      paper: "#0a2233",
+    },
+    divider: "rgba(255, 255, 255, 0.08)",
+    text: {
+      secondary: "rgba(255, 255, 255, 0.6)",
+    },
   },
 });
 

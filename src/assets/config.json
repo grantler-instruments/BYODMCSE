@@ -116,6 +116,36 @@
               "options": {"min": 0, "max": 1}
             }
           }
+        },
+        {
+          "id": "d7e8f9a0-b1c2-3456-7890-abcdef123456",
+          "type": "tremolo",
+          "name": "Tremolo",
+          "parameters": {
+            "active": {
+              "id": "e8f9a0b1-c2d3-4567-8901-bcdef1234567",
+              "name": "Active",
+              "value": true
+            },
+            "rate": {
+              "id": "f9a0b1c2-d3e4-5678-9012-cdef12345678",
+              "name": "Rate",
+              "value": 4.5,
+              "options": {"min": 0, "max": 12}
+            },
+            "depth": {
+              "id": "a0b1c2d3-e4f5-6789-0123-def123456789",
+              "name": "Depth",
+              "value": 0.3,
+              "options": {"min": 0, "max": 1}
+            },
+            "mix": {
+              "id": "b1c2d3e4-f5a6-7890-1234-ef1234567890",
+              "name": "Mix",
+              "value": 0.5,
+              "options": {"min": 0, "max": 1}
+            }
+          }
         }
       ],
       "midiEffects": [],
@@ -136,6 +166,123 @@
       "effects": [],
       "midiEffects": [],
       "midiChannel": 2
+    },
+    {
+      "id": "c4d5e6f7-a8b9-0123-cdef-456789012345",
+      "name": "rhodes",
+      "instrument": {
+        "id": "d5e6f7a8-b9c0-1234-def0-567890123456",
+        "name": "Rhodes",
+        "type": "rhodes",
+        "parameters": {
+          "attack": {
+            "id": "e6f7a8b9-c0d1-2345-ef01-678901234567",
+            "name": "Attack",
+            "value": 0.002,
+            "options": { "min": 0, "max": 0.5 }
+          },
+          "decay": {
+            "id": "f7a8b9c0-d1e2-3456-f012-789012345678",
+            "name": "Decay",
+            "value": 1.4,
+            "options": { "min": 0, "max": 5 }
+          },
+          "sustain": {
+            "id": "a8b9c0d1-e2f3-4567-0123-890123456789",
+            "name": "Sustain",
+            "value": 0.42,
+            "options": { "min": 0, "max": 1 }
+          },
+          "release": {
+            "id": "b9c0d1e2-f3a4-5678-1234-901234567890",
+            "name": "Release",
+            "value": 0.9,
+            "options": { "min": 0, "max": 5 }
+          },
+          "bell": {
+            "id": "c0d1e2f3-a4b5-6789-2345-012345678901",
+            "name": "Bell",
+            "value": 65,
+            "options": { "min": 0, "max": 200 }
+          },
+          "bellRatio": {
+            "id": "d1e2f3a4-b5c6-7890-3456-123456789012",
+            "name": "Bell Ratio",
+            "value": 3.2,
+            "options": { "min": 2, "max": 8 }
+          },
+          "filterCutoff": {
+            "id": "e2f3a4b5-c6d7-8901-4567-234567890123",
+            "name": "Filter Cutoff",
+            "value": 2800,
+            "options": { "min": 500, "max": 12000 }
+          },
+          "filterEnv": {
+            "id": "f3a4b5c6-d7e8-9012-5678-345678901234",
+            "name": "Filter Envelope",
+            "value": 0.35,
+            "options": { "min": 0, "max": 1 }
+          },
+          "tremoloRate": {
+            "id": "a4b5c6d7-e8f9-0123-6789-456789012345",
+            "name": "Tremolo Rate",
+            "value": 4.5,
+            "options": { "min": 0, "max": 12 }
+          },
+          "tremoloDepth": {
+            "id": "b5c6d7e8-f9a0-1234-7890-567890123456",
+            "name": "Tremolo Depth",
+            "value": 0.18,
+            "options": { "min": 0, "max": 1 }
+          },
+          "drive": {
+            "id": "c6d7e8f9-a0b1-2345-8901-678901234567",
+            "name": "Drive",
+            "value": 1.15,
+            "options": { "min": 0.5, "max": 4 }
+          }
+        }
+      },
+      "effects": [
+        {
+          "id": "c7d8e9f0-a1b2-3456-c789-012345678901",
+          "type": "chorus",
+          "name": "Chorus",
+          "parameters": {
+            "active": {
+              "id": "d8e9f0a1-b2c3-4567-d890-123456789012",
+              "name": "Active",
+              "value": true
+            },
+            "rate": {
+              "id": "e9f0a1b2-c3d4-5678-e901-234567890123",
+              "name": "Rate",
+              "value": 0.8,
+              "options": { "min": 0.1, "max": 5 }
+            },
+            "depth": {
+              "id": "f0a1b2c3-d4e5-6789-f012-345678901234",
+              "name": "Depth",
+              "value": 6,
+              "options": { "min": 0, "max": 20 }
+            },
+            "time": {
+              "id": "a1b2c3d4-e5f6-7890-a123-456789012345",
+              "name": "Delay",
+              "value": 25,
+              "options": { "min": 5, "max": 50 }
+            },
+            "mix": {
+              "id": "b2c3d4e5-f6a7-8901-b234-567890123456",
+              "name": "Mix",
+              "value": 0.45,
+              "options": { "min": 0, "max": 1 }
+            }
+          }
+        }
+      ],
+      "midiEffects": [],
+      "midiChannel": 3
     },
     {
       "id": "539415fc-47ff-4a8d-bc16-88e8dd43ffbf",
@@ -179,12 +326,69 @@
               "name": "Mix",
               "value": 0.5,
               "options": {"min": 0, "max": 1}
+            },
+            "feedback": {
+              "id": "c8d9e0f1-a234-5678-9abc-def012345678",
+              "name": "Feedback",
+              "value": 0.4,
+              "options": {"min": 0, "max": 0.95}
             }
           }
         }
       ],
       "midiEffects": [],
       "midiChannel": 4
+    },
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "drums",
+      "instrument": {
+        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        "name": "Drum Synth",
+        "type": "drumSynth",
+        "parameters": {},
+        "config": {
+          "36": { "type": "kick", "pitch": 40, "drive": 4 },
+          "38": { "type": "clap", "tone": 800, "decay": 0.3 },
+          "42": { "type": "hat", "pitch": 317, "tone": 12000, "decay": 0.08 },
+          "46": { "type": "hat", "pitch": 450, "tone": 14000, "decay": 0.12 },
+          "49": { "type": "clap", "tone": 1200, "decay": 0.5 }
+        }
+      },
+      "effects": [
+        {
+          "id": "d4e5f6a7-b890-cdef-1234-567890abcdef",
+          "type": "delay",
+          "name": "Delay",
+          "parameters": {
+            "active": {
+              "id": "e5f6a7b8-c901-def2-3456-7890abcdef01",
+              "name": "Active",
+              "value": true
+            },
+            "time": {
+              "id": "f6a7b8c9-d012-ef34-5678-90abcdef0123",
+              "name": "Time",
+              "value": 10000,
+              "options": { "min": 0, "max": 10000 }
+            },
+            "mix": {
+              "id": "a7b8c9d0-e123-f456-7890-abcdef012345",
+              "name": "Mix",
+              "value": 0.65,
+              "options": { "min": 0, "max": 1 }
+            },
+            "feedback": {
+              "id": "b8c9d0e1-f234-6789-abcd-ef0123456789",
+              "name": "Feedback",
+              "value": 0.7,
+              "options": { "min": 0, "max": 0.95 }
+            }
+          }
+        }
+      ],
+      "midiEffects": [],
+      "midiChannel": 10
     },
     {
       "id": "5a5735cc-444e-4a5c-8481-0f0c3f92d569",

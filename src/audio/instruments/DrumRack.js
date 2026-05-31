@@ -1,6 +1,7 @@
 import { el } from "@elemaudio/core";
 import { v4 } from "uuid";
 import Base from "./Base";
+import { pulseGate } from "../triggerGate";
 import { createConstRef, createGateRef } from "../voiceRefs";
 
 class DrumRack extends Base {
@@ -44,14 +45,7 @@ class DrumRack extends Base {
     pad.velocity = velocity / 127;
 
     await pad.setVelocity({ value: pad.velocity });
-
-    if (pad.gate === 1.0) {
-      await pad.setGate({ value: 0.0 });
-      pad.gate = 0.0;
-    }
-
-    await pad.setGate({ value: 1.0 });
-    pad.gate = 1.0;
+    await pulseGate(pad);
   }
 
   noteOff(note) {}

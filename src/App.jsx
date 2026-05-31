@@ -1,4 +1,4 @@
-import { createBrowserRouter, createHashRouter, RouterProvider } from "react-router-dom";
+import { createHashRouter, Outlet, RouterProvider } from "react-router-dom";
 import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 import { Box } from "@mui/material";
@@ -11,26 +11,50 @@ import { useEffect } from "react";
 
 const router = createHashRouter([
   {
-    path: "/",
-    element: <SoundCheck></SoundCheck>
-  },
-  {
-    path: "/rooms/:roomId",
-    element: <Room></Room>
+    element: (
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          width: "100%",
+          display: "flex",
+        }}
+      >
+        <Outlet />
+      </Box>
+    ),
+    children: [
+      {
+        path: "/",
+        element: <SoundCheck />,
+      },
+      {
+        path: "/rooms/:roomId",
+        element: <Room />,
+      },
+    ],
   },
 ]);
 
 function App() {
   return (
-    <Box width={"100vw"} height={"100vh"} display={"flex"}>
     <ThemeProvider theme={theme}>
-      <CssBaseline></CssBaseline>
-      <RouterProvider
-        router={router}
+      <CssBaseline />
+      <Box
+        sx={{
+          width: "100vw",
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
       >
-      </RouterProvider>
+        <Box className="app-shell">
+          <RouterProvider router={router} />
+        </Box>
+      </Box>
     </ThemeProvider>
-    </Box>
   );
 }
 

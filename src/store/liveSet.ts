@@ -18,6 +18,7 @@ interface State {
   engine: any | null;
   loading: boolean;
   selectedTrackId: string | null;
+  masterGain: number;
   init: () => void;
   start: () => void;
   render: () => void;
@@ -27,7 +28,16 @@ interface State {
   getParameterValue: (deviceId: string, parameterKey: string) => any;
   subscribeToMqtt: (roomId: string) => void;
   setSelectedTrackId: (trackId: string | null) => void;
+  setTrackGain: (trackId: string, gain: number) => void;
+  setMasterGain: (gain: number) => void;
   listenToMidi: () => void;
+}
+
+function normalizeTracks(tracks: any[]) {
+  return tracks.map((track) => ({
+    ...track,
+    gain: track.gain ?? 1,
+  }));
 }
 
 let ctx: AudioContext;
@@ -86,6 +96,7 @@ const useLiveSetStore = create<State>()(
         engine: null,
         loading: false,
         selectedTrackId: null,
+        masterGain: 1,
         init: async () => {
           set({ loading: true });
           let params = new URLSearchParams(document.location.search);
@@ -94,10 +105,18 @@ const useLiveSetStore = create<State>()(
             const config = (await axios.get(configUrl)).data;
             const tracks = config.tracks;
             console.log("loading config from external url");
-            set({ config, tracks, mappings: config.mappings });
+            set({
+              config,
+              tracks: normalizeTracks(tracks),
+              mappings: config.mappings,
+            });
           } else {
             console.log("loading config from internal json");
-            set({ config, tracks: config.tracks, mappings: config.mappings });
+            set({
+              config,
+              tracks: normalizeTracks(config.tracks),
+              mappings: config.mappings,
+            });
           }
           set({ loading: false });
         },
@@ -118,9 +137,17 @@ const useLiveSetStore = create<State>()(
             }
 
             core.updateVirtualFileSystem(files);
-            const engine = new Engine(config, core);
-            set({ engine, loading: false });
-            await commitRender(engine);
+            const engine = new Engine(
+              { ...config, masterGain: get().masterGain },
+              core
+            );
+            try {
+              await commitRender(engine);
+              set({ engine, loading: false });
+            } catch (error) {
+              console.error("Audio engine render failed:", error);
+              set({ engine: null, loading: false });
+            }
           });
           const node = await core.initialize(ctx, {
             numberOfInputs: 0,
@@ -169,6 +196,7 @@ const useLiveSetStore = create<State>()(
             }
           }
           set({ tracks });
+          get().engine?.setParameter(id, value);
         },
         getParameterValue(deviceId: string, parameterKey: string) {
           const instruments = get().tracks.map(
@@ -240,7 +268,6 @@ const useLiveSetStore = create<State>()(
               } else if (typeof parameter.value === "boolean") {
                 get().setParameterValue(destination.parameter, value > 0);
               }
-              get().render();
             });
 
             client.on("error", (err) => {
@@ -257,9 +284,20 @@ const useLiveSetStore = create<State>()(
         },
         setSelectedTrackId: (selectedTrackId: string | null) => {
           set({ selectedTrackId });
-          if(useAppStore.getState().showFileBrowser){
-            useAppStore.getState().toggleShowFileBrowser();
+          if (useAppStore.getState().showFileBrowser) {
+            useAppStore.getState().setShowFileBrowser(false);
           }
+        },
+        setTrackGain: (trackId: string, gain: number) => {
+          const tracks = get().tracks.map((track) =>
+            track.id === trackId ? { ...track, gain } : track
+          );
+          set({ tracks });
+          get().engine?.setTrackGain(trackId, gain);
+        },
+        setMasterGain: (gain: number) => {
+          set({ masterGain: gain });
+          get().engine?.setMasterGain(gain);
         },
         listenToMidi: async () => {
           if (await navigator.requestMIDIAccess()) {

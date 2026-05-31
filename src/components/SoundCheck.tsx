@@ -1,114 +1,182 @@
-import { useEffect, useState } from "react";
-import { Box, Button, CircularProgress } from "@mui/material";
-import Keyboard from "./Keyboard";
+import { useCallback, useEffect } from "react";
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Drawer,
+  Stack,
+  Typography,
+} from "@mui/material";
 import useLiveSetStore from "../store/liveSet";
 import Tracks from "./Tracks";
-import TrackDetails from "./TrackDetails";
-import DrumPad from "./DrumPad";
-import SideBar from "./SideBar";
+import SideBar, { SIDEBAR_WIDTH } from "./SideBar";
 import FileBrowser from "./FileBrowser";
+import Keyboard from "./Keyboard";
 import useAppStore from "../store/app";
+
+const FILE_DRAWER_WIDTH = 360;
 
 function SoundCheck() {
   const showFileBrowser = useAppStore((state) => state.showFileBrowser);
+  const setShowFileBrowser = useAppStore((state) => state.setShowFileBrowser);
+  const showVirtualKeyboard = useAppStore((state) => state.showVirtualKeyboard);
   const initOrchestra = useLiveSetStore((state) => state.init);
   const listenToMidi = useLiveSetStore((state) => state.listenToMidi);
   const subscribeToMqtt = useLiveSetStore((state) => state.subscribeToMqtt);
   const start = useLiveSetStore((state) => state.start);
   const engine = useLiveSetStore((state) => state.engine);
   const tracks = useLiveSetStore((state) => state.tracks);
-  const selectedTrackId = useLiveSetStore((state) => state.selectedTrackId);
   const armedTracks = useLiveSetStore((state) => state.armedTracks);
-  const selectedInstrumentId = useLiveSetStore(
-    (state) => state.selectedInstrument
-  );
   const loading = useLiveSetStore((state) => state.loading);
+
   useEffect(() => {
     initOrchestra();
     listenToMidi();
-    subscribeToMqtt("demo")
+    subscribeToMqtt("demo");
   }, [initOrchestra, listenToMidi, subscribeToMqtt]);
 
-  const instruments = tracks.map((track) => track.instrument);
-  const selectedInstrument = instruments.find(
-    (instrument) => instrument.id === selectedInstrumentId
+  const handleKeyPressed = useCallback(
+    (note: number, velocity: number) => {
+      if (!engine) return;
+      tracks
+        .filter((track) => armedTracks.includes(track.id))
+        .forEach((track) => {
+          engine.noteOn(track.midiChannel, note, velocity);
+        });
+    },
+    [engine, tracks, armedTracks]
   );
 
-  const selectedTrack = tracks.find((track) => track.id === selectedTrackId);
-
-  const handleKeyPressed = (note: number, velocity: number) => {
-    if (engine) {
+  const handleKeyReleased = useCallback(
+    (note: number, velocity: number) => {
+      if (!engine) return;
       tracks
         .filter((track) => armedTracks.includes(track.id))
-        ?.map((i) => {
-          engine.noteOn(i.midiChannel, note, velocity);
+        .forEach((track) => {
+          engine.noteOff(track.midiChannel, note, velocity);
         });
-    }
-  };
-
-  const handleKeyReleased = (note: number, velocity: number) => {
-    if (engine) {
-      tracks
-        .filter((track) => armedTracks.includes(track.id))
-        ?.map((i) => {
-          engine.noteOff(i.midiChannel, note, velocity);
-        });
-    }
-  };
+    },
+    [engine, tracks, armedTracks]
+  );
 
   return (
-    <Box display={"flex"} flexDirection={"row"} width="100%" height="100%">
-      <SideBar></SideBar>
+    <Box
+      sx={{
+        width: "100vw",
+        height: "100vh",
+        display: "flex",
+        flexDirection: "row",
+        overflow: "hidden",
+        bgcolor: "background.default",
+      }}
+    >
+      <SideBar />
+
       <Box
-        display={"flex"}
-        flexDirection={"column"}
-        sx={{ padding: "24px", width: "100%", height: "100%" }}
+        component="main"
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          p: { xs: 2, md: 3 },
+          gap: 2,
+          overflow: engine ? "hidden" : "auto",
+        }}
       >
         {!engine && (
-          <Box sx={{ margin: "24px" }} display={"flex"}>
+          <Stack
+            spacing={2}
+            sx={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              maxWidth: 420,
+              mx: "auto",
+              width: "100%",
+            }}
+          >
+            <Typography variant="h5" color="primary" sx={{ textAlign: "center" }}>
+              Sound check
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
+              Start the audio engine to load tracks and play instruments.
+            </Typography>
             <Button
               onClick={start}
-              variant={"contained"}
+              variant="contained"
               size="large"
-              width={"100%"}
+              fullWidth
               disabled={loading}
               startIcon={
-                loading ? (
-                  <CircularProgress size={"12px"}></CircularProgress>
-                ) : null
+                loading ? <CircularProgress size={16} color="inherit" /> : null
               }
             >
-              turn on the engine
+              Turn on the engine
             </Button>
-          </Box>
+          </Stack>
         )}
 
         {engine && (
-          <>
-            <Box flex={1}>
-              <Tracks></Tracks>
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              overflow: "hidden",
+              width: "100%",
+              display: "flex",
+              flexDirection: "column",
+              gap: 1,
+            }}
+          >
+            <Box sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+              <Tracks />
             </Box>
-            {showFileBrowser && <FileBrowser></FileBrowser>}
-            {!showFileBrowser && (
-              <TrackDetails>
-                {selectedTrack?.instrument.type === "drumRack" && (
-                  <DrumPad
-                    config={{}}
-                    onKeyPressed={handleKeyPressed}
-                    onKeyReleased={handleKeyReleased}
-                  ></DrumPad>
-                )}
-                {selectedTrack?.instrument.type !== "drumRack" && (
-                  <Keyboard
-                    onKeyPressed={handleKeyPressed}
-                    onKeyReleased={handleKeyReleased}
-                  />
-                )}
-              </TrackDetails>
+            {showVirtualKeyboard && (
+              <Box
+                sx={{
+                  flexShrink: 0,
+                  borderTop: 1,
+                  borderColor: "divider",
+                  bgcolor: "rgba(0, 0, 0, 0.35)",
+                  borderRadius: 2,
+                  px: 1.5,
+                  py: 1,
+                }}
+              >
+                <Keyboard
+                  compact
+                  onKeyPressed={handleKeyPressed}
+                  onKeyReleased={handleKeyReleased}
+                />
+              </Box>
             )}
-          </>
+          </Box>
         )}
       </Box>
+
+      <Drawer
+        anchor="left"
+        open={showFileBrowser}
+        onClose={() => setShowFileBrowser(false)}
+        sx={{
+          "& .MuiBackdrop-root": {
+            left: SIDEBAR_WIDTH,
+            width: `calc(100% - ${SIDEBAR_WIDTH}px)`,
+          },
+          "& .MuiDrawer-paper": {
+            left: SIDEBAR_WIDTH,
+            width: FILE_DRAWER_WIDTH,
+            boxSizing: "border-box",
+            bgcolor: "background.default",
+            borderRight: 1,
+            borderColor: "divider",
+          },
+        }}
+      >
+        <FileBrowser onClose={() => setShowFileBrowser(false)} />
+      </Drawer>
     </Box>
   );
 }
