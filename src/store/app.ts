@@ -8,12 +8,16 @@ interface State {
   users: any[];
   showFileBrowser: boolean;
   showVirtualKeyboard: boolean;
+  showSetsLibrary: boolean;
+  showMqttPanel: boolean;
   addUser: (uuid: string) => void;
   removeUser: (uuid: string) => void;
   toggleShowFileBrowser: () => void;
   setShowFileBrowser: (show: boolean) => void;
   toggleShowVirtualKeyboard: () => void;
   setShowVirtualKeyboard: (show: boolean) => void;
+  setShowSetsLibrary: (show: boolean) => void;
+  setShowMqttPanel: (show: boolean) => void;
 }
 
 const useAppStore = create<State>()(
@@ -24,6 +28,8 @@ const useAppStore = create<State>()(
         users: [],
         showFileBrowser: false,
         showVirtualKeyboard: false,
+        showSetsLibrary: false,
+        showMqttPanel: false,
         // Add a new user to the list of users
         addUser: (uuid: string) => {
           const users = get().users
@@ -50,6 +56,12 @@ const useAppStore = create<State>()(
         },
         setShowVirtualKeyboard: (show: boolean) => {
           set({ showVirtualKeyboard: show });
+        },
+        setShowSetsLibrary: (show: boolean) => {
+          set({ showSetsLibrary: show });
+        },
+        setShowMqttPanel: (show: boolean) => {
+          set({ showMqttPanel: show });
         },
       }),
       {

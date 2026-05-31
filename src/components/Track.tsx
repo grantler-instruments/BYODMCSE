@@ -2,6 +2,8 @@ import {
   Box,
   Collapse,
   IconButton,
+  MenuItem,
+  Select,
   Slider,
   ToggleButton,
   Typography,
@@ -32,6 +34,9 @@ function Track({
     (state) => state.setSelectedTrackId
   );
   const setTrackGain = useLiveSetStore((state) => state.setTrackGain);
+  const setTrackMidiChannel = useLiveSetStore(
+    (state) => state.setTrackMidiChannel
+  );
   const gain = track.gain ?? 1;
   const isArmed = armedTracks.includes(track.id);
 
@@ -151,13 +156,38 @@ function Track({
           </Typography>
         </Box>
 
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ fontSize: "0.65rem", lineHeight: 1, flexShrink: 0 }}
+        <Select
+          size="small"
+          value={track.midiChannel}
+          aria-label={`${track.name} MIDI channel`}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            e.stopPropagation();
+            setTrackMidiChannel(track.id, Number(e.target.value));
+          }}
+          sx={{
+            flexShrink: 0,
+            width: "100%",
+            maxWidth: 72,
+            fontSize: "0.65rem",
+            color: "text.secondary",
+            "& .MuiSelect-select": {
+              py: 0.25,
+              pl: 0.75,
+              pr: "20px !important",
+              minHeight: "unset",
+            },
+            "& .MuiOutlinedInput-notchedOutline": {
+              borderColor: "divider",
+            },
+          }}
         >
-          ch {track.midiChannel}
-        </Typography>
+          {Array.from({ length: 16 }, (_, index) => index + 1).map((channel) => (
+            <MenuItem key={channel} value={channel} dense sx={{ fontSize: "0.8rem" }}>
+              ch {channel}
+            </MenuItem>
+          ))}
+        </Select>
 
         <ToggleButton
           value={track.id}

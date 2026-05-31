@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Box } from "@mui/material";
+import { Box, IconButton, Tooltip } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import useLiveSetStore from "../store/liveSet";
+import AddTrackDialog from "./AddTrackDialog";
 import MasterTrack from "./MasterTrack";
 import Track from "./Track";
 
@@ -10,6 +12,7 @@ function Tracks() {
     (state) => state.setSelectedTrackId
   );
   const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null);
+  const [addTrackOpen, setAddTrackOpen] = useState(false);
 
   const toggleExpand = (trackId: string) => {
     setExpandedTrackId((current) => {
@@ -54,8 +57,38 @@ function Tracks() {
             onToggleExpand={() => toggleExpand(track.id)}
           />
         ))}
+        <Box
+          sx={{
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            px: 1,
+            borderRight: 1,
+            borderColor: "divider",
+          }}
+        >
+          <Tooltip title="Add track">
+            <IconButton
+              aria-label="Add track"
+              onClick={() => setAddTrackOpen(true)}
+              color="primary"
+              sx={{
+                border: 1,
+                borderColor: "divider",
+                borderStyle: "dashed",
+              }}
+            >
+              <AddIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </Box>
       <MasterTrack />
+      <AddTrackDialog
+        open={addTrackOpen}
+        onClose={() => setAddTrackOpen(false)}
+      />
     </Box>
   );
 }

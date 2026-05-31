@@ -8,32 +8,77 @@ import {
   Typography,
 } from "@mui/material";
 import useLiveSetStore from "../store/liveSet";
+import { shouldAutoConnectMqtt } from "../store/mqttSettings";
 import Tracks from "./Tracks";
 import SideBar, { SIDEBAR_WIDTH } from "./SideBar";
 import FileBrowser from "./FileBrowser";
+import SetsLibrary from "./SetsLibrary";
+import MqttPanel from "./MqttPanel";
 import Keyboard from "./Keyboard";
 import useAppStore from "../store/app";
 
-const FILE_DRAWER_WIDTH = 360;
+const DRAWER_WIDTH = 520;
 
 function SoundCheck() {
   const showFileBrowser = useAppStore((state) => state.showFileBrowser);
   const setShowFileBrowser = useAppStore((state) => state.setShowFileBrowser);
+  const showSetsLibrary = useAppStore((state) => state.showSetsLibrary);
+  const setShowSetsLibrary = useAppStore((state) => state.setShowSetsLibrary);
+  const showMqttPanel = useAppStore((state) => state.showMqttPanel);
+  const setShowMqttPanel = useAppStore((state) => state.setShowMqttPanel);
   const showVirtualKeyboard = useAppStore((state) => state.showVirtualKeyboard);
   const initOrchestra = useLiveSetStore((state) => state.init);
   const listenToMidi = useLiveSetStore((state) => state.listenToMidi);
-  const subscribeToMqtt = useLiveSetStore((state) => state.subscribeToMqtt);
+  const connectMqtt = useLiveSetStore((state) => state.connectMqtt);
   const start = useLiveSetStore((state) => state.start);
   const engine = useLiveSetStore((state) => state.engine);
   const tracks = useLiveSetStore((state) => state.tracks);
   const armedTracks = useLiveSetStore((state) => state.armedTracks);
   const loading = useLiveSetStore((state) => state.loading);
+  const saveCurrentSet = useLiveSetStore((state) => state.saveCurrentSet);
+  const newEmptySet = useLiveSetStore((state) => state.newEmptySet);
 
   useEffect(() => {
-    initOrchestra();
-    listenToMidi();
-    subscribeToMqtt("demo");
-  }, [initOrchestra, listenToMidi, subscribeToMqtt]);
+    const bootstrap = async () => {
+      await initOrchestra();
+      listenToMidi();
+      const { mqttSettings } = useLiveSetStore.getState();
+      if (shouldAutoConnectMqtt(mqttSettings)) {
+        connectMqtt();
+      }
+    };
+
+    if (useLiveSetStore.persist.hasHydrated()) {
+      void bootstrap();
+      return;
+    }
+
+    return useLiveSetStore.persist.onFinishHydration(() => {
+      void bootstrap();
+    });
+  }, [initOrchestra, listenToMidi, connectMqtt]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey)) return;
+
+      const key = event.key.toLowerCase();
+      if (key === "s") {
+        event.preventDefault();
+        saveCurrentSet();
+      } else if (key === "o") {
+        event.preventDefault();
+        setShowFileBrowser(false);
+        setShowSetsLibrary(true);
+      } else if (key === "n") {
+        event.preventDefault();
+        void newEmptySet();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [saveCurrentSet, newEmptySet, setShowFileBrowser, setShowSetsLibrary]);
 
   const handleKeyPressed = useCallback(
     (note: number, velocity: number) => {
@@ -101,7 +146,7 @@ function SoundCheck() {
               Sound check
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
-              Start the audio engine to load tracks and play instruments.
+              Start the audio engine, then add tracks to build your live set.
             </Typography>
             <Button
               onClick={start}
@@ -167,7 +212,7 @@ function SoundCheck() {
           },
           "& .MuiDrawer-paper": {
             left: SIDEBAR_WIDTH,
-            width: FILE_DRAWER_WIDTH,
+            width: DRAWER_WIDTH,
             boxSizing: "border-box",
             bgcolor: "background.default",
             borderRight: 1,
@@ -176,6 +221,50 @@ function SoundCheck() {
         }}
       >
         <FileBrowser onClose={() => setShowFileBrowser(false)} />
+      </Drawer>
+
+      <Drawer
+        anchor="left"
+        open={showSetsLibrary}
+        onClose={() => setShowSetsLibrary(false)}
+        sx={{
+          "& .MuiBackdrop-root": {
+            left: SIDEBAR_WIDTH,
+            width: `calc(100% - ${SIDEBAR_WIDTH}px)`,
+          },
+          "& .MuiDrawer-paper": {
+            left: SIDEBAR_WIDTH,
+            width: DRAWER_WIDTH,
+            boxSizing: "border-box",
+            bgcolor: "background.default",
+            borderRight: 1,
+            borderColor: "divider",
+          },
+        }}
+      >
+        <SetsLibrary onClose={() => setShowSetsLibrary(false)} />
+      </Drawer>
+
+      <Drawer
+        anchor="left"
+        open={showMqttPanel}
+        onClose={() => setShowMqttPanel(false)}
+        sx={{
+          "& .MuiBackdrop-root": {
+            left: SIDEBAR_WIDTH,
+            width: `calc(100% - ${SIDEBAR_WIDTH}px)`,
+          },
+          "& .MuiDrawer-paper": {
+            left: SIDEBAR_WIDTH,
+            width: DRAWER_WIDTH,
+            boxSizing: "border-box",
+            bgcolor: "background.default",
+            borderRight: 1,
+            borderColor: "divider",
+          },
+        }}
+      >
+        <MqttPanel onClose={() => setShowMqttPanel(false)} />
       </Drawer>
     </Box>
   );

@@ -8,8 +8,11 @@ import {
   Typography,
 } from "@mui/material";
 import FolderOpenOutlinedIcon from "@mui/icons-material/FolderOpenOutlined";
+import LibraryMusicOutlinedIcon from "@mui/icons-material/LibraryMusicOutlined";
 import PianoOutlinedIcon from "@mui/icons-material/PianoOutlined";
+import SettingsInputAntennaOutlinedIcon from "@mui/icons-material/SettingsInputAntennaOutlined";
 import useAppStore from "../store/app";
+import useLiveSetStore from "../store/liveSet";
 
 export const SIDEBAR_WIDTH = 72;
 
@@ -18,6 +21,11 @@ interface Props {}
 const SideBar = (_props: Props) => {
   const showFileBrowser = useAppStore((state) => state.showFileBrowser);
   const setShowFileBrowser = useAppStore((state) => state.setShowFileBrowser);
+  const showSetsLibrary = useAppStore((state) => state.showSetsLibrary);
+  const setShowSetsLibrary = useAppStore((state) => state.setShowSetsLibrary);
+  const showMqttPanel = useAppStore((state) => state.showMqttPanel);
+  const setShowMqttPanel = useAppStore((state) => state.setShowMqttPanel);
+  const mqttStatus = useLiveSetStore((state) => state.mqttStatus);
   const showVirtualKeyboard = useAppStore((state) => state.showVirtualKeyboard);
   const setShowVirtualKeyboard = useAppStore(
     (state) => state.setShowVirtualKeyboard
@@ -76,15 +84,51 @@ const SideBar = (_props: Props) => {
           gap: 0.5,
         }}
       >
+        <Tooltip title="Live set (⌘O / Ctrl+O)" placement="right">
+          <IconButton
+            aria-label="Open live set library"
+            aria-pressed={showSetsLibrary}
+            onClick={() => {
+              setShowFileBrowser(false);
+              setShowMqttPanel(false);
+              setShowSetsLibrary(!showSetsLibrary);
+            }}
+            color={showSetsLibrary ? "primary" : "default"}
+            size="large"
+          >
+            <LibraryMusicOutlinedIcon />
+          </IconButton>
+        </Tooltip>
         <Tooltip title="Files" placement="right">
           <IconButton
             aria-label="Open file browser"
             aria-pressed={showFileBrowser}
-            onClick={() => setShowFileBrowser(!showFileBrowser)}
+            onClick={() => {
+              setShowSetsLibrary(false);
+              setShowMqttPanel(false);
+              setShowFileBrowser(!showFileBrowser);
+            }}
             color={showFileBrowser ? "primary" : "default"}
             size="large"
           >
             <FolderOpenOutlinedIcon />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="MQTT connection" placement="right">
+          <IconButton
+            aria-label="Open MQTT settings"
+            aria-pressed={showMqttPanel}
+            onClick={() => {
+              setShowFileBrowser(false);
+              setShowSetsLibrary(false);
+              setShowMqttPanel(!showMqttPanel);
+            }}
+            color={
+              showMqttPanel || mqttStatus === "connected" ? "primary" : "default"
+            }
+            size="large"
+          >
+            <SettingsInputAntennaOutlinedIcon />
           </IconButton>
         </Tooltip>
         <Tooltip title="Virtual keyboard" placement="right">
