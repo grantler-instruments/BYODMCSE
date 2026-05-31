@@ -89,6 +89,10 @@ class Engine {
             instance = new Chorus(effect.id, core, effect.parameters)
             break;
           }
+          case "reverb": {
+            instance = new Reverb(effect.id, core, effect.parameters)
+            break;
+          }
           default: {
             console.error(`Effect ${effect.type} not supported`)
             return null

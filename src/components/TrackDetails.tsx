@@ -25,9 +25,20 @@ function TrackDetails({ children, track, layout = "row" }: Props) {
     >
       {children}
       {instrument && <Instrument instrument={instrument}></Instrument>}
-      {track?.effects?.map((effect: any) => {
-        return <Effect key={effect.id} effect={effect}></Effect>;
-      })}
+      {track?.effects?.length > 0 && (
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: isStrip ? 1 : 2,
+            width: isStrip ? "100%" : "auto",
+          }}
+        >
+          {track.effects.map((effect: any) => (
+            <Effect key={effect.id} effect={effect} />
+          ))}
+        </Box>
+      )}
     </Box>
   );
 }

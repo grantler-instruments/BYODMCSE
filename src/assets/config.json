@@ -279,6 +279,42 @@
               "options": { "min": 0, "max": 1 }
             }
           }
+        },
+        {
+          "id": "f1e2d3c4-b5a6-7890-fedc-ba9876543210",
+          "type": "reverb",
+          "name": "Reverb",
+          "parameters": {
+            "active": {
+              "id": "e2d3c4b5-a697-8901-fedc-ba9876543211",
+              "name": "Active",
+              "value": true
+            },
+            "mix": {
+              "id": "d3c4b5a6-9788-9012-edcb-a98765432112",
+              "name": "Mix",
+              "value": 0.4,
+              "options": { "min": 0, "max": 1 }
+            },
+            "size": {
+              "id": "c4b5a697-8899-0123-dcba-987654321013",
+              "name": "Size",
+              "value": 0.75,
+              "options": { "min": 0, "max": 1 }
+            },
+            "decay": {
+              "id": "b5a69788-9900-1234-cbad-876543210214",
+              "name": "Decay",
+              "value": 0.8,
+              "options": { "min": 0, "max": 1 }
+            },
+            "mod": {
+              "id": "a6978899-0011-2345-abcd-765432103215",
+              "name": "Modulation",
+              "value": 0.3,
+              "options": { "min": 0, "max": 1 }
+            }
+          }
         }
       ],
       "midiEffects": [],
