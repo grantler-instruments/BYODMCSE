@@ -125,24 +125,36 @@
         },
         {
           "id": "22e981a9-85eb-421b-b3c5-e7f4902ccd4f",
-          "type": "distortion",
-          "name": "Distortion",
+          "type": "drive",
+          "name": "Drive",
           "parameters":{
             "active": {
             "id": "73e09c7a-55e9-4a74-b805-ef9c58ef08f0",
             "name": "Active",
             "value": true
             },
+            "mode": {
+              "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "name": "Mode",
+              "value": "overdrive",
+              "options": ["overdrive", "distortion", "fuzz"]
+            },
             "drive": {
             "id": "fcb8a291-3a78-45b3-813d-00989bc6a011",
             "name": "Drive",
-            "value": 1.2,
-            "options": {"min": 0, "max": 2}
+            "value": 1.5,
+            "options": {"min": 0, "max": 15}
+            },
+            "tone": {
+              "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+              "name": "Tone",
+              "value": 6000,
+              "options": {"min": 500, "max": 12000}
             },
             "mix": {
               "id": "7d7783ed-a81f-4f36-828a-2f93d5085855",
               "name": "Mix",
-              "value": 0.5,
+              "value": 0.45,
               "options": {"min": 0, "max": 1}
             }
           }

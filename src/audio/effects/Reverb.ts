@@ -6,6 +6,7 @@ import {
   type ParameterSetter,
 } from "../effectRefs";
 import { srvbMono } from "./srvb";
+import { coerceBoolean, readParamBoolean } from "../parameterUtils";
 
 class Reverb extends Base {
   private dryRef: ReturnType<typeof createEffectParamRef>;
@@ -19,18 +20,17 @@ class Reverb extends Base {
   constructor(id: string, core: any, parameters: Record<string, any> = {}) {
     super(id);
     this.mix = parameters.mix?.value ?? 0.35;
-    this.active = parameters.active?.value ?? true;
+    this.active = readParamBoolean(parameters, "active", true);
 
-    const effectiveMix = this.active ? this.mix : 0;
     this.dryRef = createEffectParamRef(
       core,
       `reverb-${id}-dry`,
-      1 - effectiveMix
+      1 - this.mix
     );
     this.wetRef = createEffectParamRef(
       core,
       `reverb-${id}-wet`,
-      effectiveMix
+      this.mix
     );
     this.sizeRef = createEffectParamRef(
       core,
@@ -51,12 +51,12 @@ class Reverb extends Base {
 
   registerParameterSetters(
     setters: Map<string, ParameterSetter>,
-    parameters: Record<string, any>
+    parameters: Record<string, any>,
+    requestRender?: () => void
   ) {
     const updateMix = async () => {
-      const wet = this.active ? this.mix : 0;
-      await this.wetRef.setValue({ value: wet });
-      await this.dryRef.setValue({ value: 1 - wet });
+      await this.wetRef.setValue({ value: this.mix });
+      await this.dryRef.setValue({ value: 1 - this.mix });
     };
 
     registerEffectParameter(setters, parameters.mix, async (value) => {
@@ -76,13 +76,17 @@ class Reverb extends Base {
       await this.modRef.setValue({ value });
     });
 
-    registerEffectParameter(setters, parameters.active, async (value) => {
-      this.active = value;
-      await updateMix();
+    registerEffectParameter(setters, parameters.active, (value) => {
+      this.active = coerceBoolean(value, this.active);
+      requestRender?.();
     });
   }
 
   render(signal: any) {
+    if (!this.active) {
+      return signal;
+    }
+
     const size = el.sm(this.sizeRef.node);
     const decay = el.sm(this.decayRef.node);
     const modDepth = el.sm(this.modRef.node);

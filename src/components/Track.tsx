@@ -1,7 +1,8 @@
+import { useRef, useState, type MouseEvent, type TouchEvent } from "react";
 import {
   Box,
   Collapse,
-  IconButton,
+  Menu,
   MenuItem,
   Select,
   Slider,
@@ -28,20 +29,110 @@ function Track({
   expanded,
   onToggleExpand,
 }: Props) {
+  const [menuPosition, setMenuPosition] = useState<{
+    mouseX: number;
+    mouseY: number;
+  } | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressClickRef = useRef(false);
   const armedTracks = useLiveSetStore((state) => state.armedTracks);
+  const selectedTrackId = useLiveSetStore((state) => state.selectedTrackId);
   const toggleArmedTrack = useLiveSetStore((state) => state.toggleArmedTrack);
-  const setSelectedTrackId = useLiveSetStore(
-    (state) => state.setSelectedTrackId
-  );
+  const renameTrack = useLiveSetStore((state) => state.renameTrack);
+  const duplicateTrack = useLiveSetStore((state) => state.duplicateTrack);
+  const deleteTrack = useLiveSetStore((state) => state.deleteTrack);
+  const isSelected = selectedTrackId === track.id;
   const setTrackGain = useLiveSetStore((state) => state.setTrackGain);
   const setTrackMidiChannel = useLiveSetStore(
     (state) => state.setTrackMidiChannel
   );
   const gain = track.gain ?? 1;
   const isArmed = armedTracks.includes(track.id);
+  const isMenuOpen = Boolean(menuPosition);
+
+  const stopControlClick = (e: MouseEvent) => {
+    e.stopPropagation();
+  };
+
+  const handleCloseMenu = () => {
+    setMenuPosition(null);
+  };
+
+  const handleContextMenu = (e: MouseEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuPosition({ mouseX: e.clientX + 2, mouseY: e.clientY - 6 });
+  };
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleTouchStart = (e: TouchEvent<HTMLElement>) => {
+    clearLongPressTimer();
+    const touch = e.touches[0];
+    longPressTimerRef.current = setTimeout(() => {
+      suppressClickRef.current = true;
+      setMenuPosition({ mouseX: touch.clientX + 2, mouseY: touch.clientY - 6 });
+    }, 550);
+  };
+
+  const handleTouchMove = () => {
+    clearLongPressTimer();
+  };
+
+  const handleTouchEnd = () => {
+    clearLongPressTimer();
+  };
+
+  const handleRename = () => {
+    handleCloseMenu();
+    const nextName = window.prompt("Rename track", track.name);
+    if (nextName && nextName.trim()) {
+      renameTrack(track.id, nextName);
+    }
+  };
+
+  const handleCopy = async () => {
+    handleCloseMenu();
+    const payload = JSON.stringify(track, null, 2);
+    try {
+      await navigator.clipboard.writeText(payload);
+    } catch (error) {
+      console.error("Failed to copy track:", error);
+    }
+  };
+
+  const handleDuplicate = () => {
+    handleCloseMenu();
+    void duplicateTrack(track.id);
+  };
+
+  const handleDelete = () => {
+    handleCloseMenu();
+    void deleteTrack(track.id);
+  };
 
   return (
     <Box
+      onClick={(e) => {
+        if (suppressClickRef.current) {
+          suppressClickRef.current = false;
+          e.stopPropagation();
+          return;
+        }
+        onToggleExpand();
+      }}
+      onContextMenu={handleContextMenu}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      role="button"
+      aria-label={expanded ? "Collapse channel" : "Expand channel"}
+      aria-expanded={expanded}
       sx={{
         display: "flex",
         flexDirection: "row",
@@ -49,6 +140,7 @@ function Track({
         flexShrink: 0,
         borderRight: 1,
         borderColor: "divider",
+        cursor: "pointer",
         bgcolor: expanded ? "rgba(0, 0, 0, 0.4)" : "rgba(0, 0, 0, 0.28)",
       }}
     >
@@ -62,28 +154,32 @@ function Track({
           py: 1.5,
           px: 0.5,
           gap: 1,
-          cursor: "pointer",
-          bgcolor: isArmed ? "rgba(42, 157, 143, 0.12)" : "transparent",
+          bgcolor:
+            expanded || isSelected
+              ? "rgba(42, 157, 143, 0.12)"
+              : isArmed
+                ? "rgba(42, 157, 143, 0.06)"
+                : "transparent",
           borderLeft: 3,
           borderColor: expanded
             ? "primary.main"
-            : isArmed
+            : isSelected
               ? "primary.dark"
-              : "transparent",
+              : isArmed
+                ? "primary.dark"
+                : "transparent",
         }}
-        onClick={() => setSelectedTrackId(track.id)}
       >
-        <IconButton
-          size="small"
-          aria-label={expanded ? "Collapse channel" : "Expand channel"}
-          aria-expanded={expanded}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleExpand();
-          }}
+        <Box
+          component="span"
+          sx={{ display: "flex", color: "text.secondary", lineHeight: 0 }}
         >
-          {expanded ? <ChevronLeftIcon /> : <ChevronRightIcon />}
-        </IconButton>
+          {expanded ? (
+            <ChevronLeftIcon fontSize="small" />
+          ) : (
+            <ChevronRightIcon fontSize="small" />
+          )}
+        </Box>
 
         <Typography
           variant="caption"
@@ -116,7 +212,6 @@ function Track({
             width: "100%",
             py: 0.5,
           }}
-          onClick={(e) => e.stopPropagation()}
         >
           <Slider
             orientation="vertical"
@@ -125,13 +220,14 @@ function Track({
             max={1}
             step={0.01}
             aria-label={`${track.name} gain`}
+            onMouseDown={stopControlClick}
+            onClick={stopControlClick}
             onChange={(_, value) =>
               setTrackGain(track.id, value as number)
             }
             sx={{
-              flex: 1,
-              height: "100%",
-              maxHeight: 160,
+              height: 140,
+              flexShrink: 0,
               color: "primary.main",
               "& .MuiSlider-thumb": {
                 width: 14,
@@ -160,9 +256,9 @@ function Track({
           size="small"
           value={track.midiChannel}
           aria-label={`${track.name} MIDI channel`}
-          onClick={(e) => e.stopPropagation()}
+          onMouseDown={stopControlClick}
+          onClick={stopControlClick}
           onChange={(e) => {
-            e.stopPropagation();
             setTrackMidiChannel(track.id, Number(e.target.value));
           }}
           sx={{
@@ -194,7 +290,8 @@ function Track({
           selected={isArmed}
           size="small"
           sx={{ flexShrink: 0 }}
-          onClick={(e) => e.stopPropagation()}
+          onMouseDown={stopControlClick}
+          onClick={stopControlClick}
           onChange={() => toggleArmedTrack(track.id)}
         >
           <FiberManualRecord color={isArmed ? "primary" : "default"} />
@@ -208,6 +305,8 @@ function Track({
         sx={{ height: "100%" }}
       >
         <Box
+          onClick={stopControlClick}
+          onMouseDown={stopControlClick}
           sx={{
             width: { xs: 300, sm: EXPANDED_WIDTH },
             maxWidth: "min(70vw, 640px)",
@@ -232,6 +331,23 @@ function Track({
           </Box>
         </Box>
       </Collapse>
+
+      <Menu
+        open={isMenuOpen}
+        onClose={handleCloseMenu}
+        onClick={(e) => e.stopPropagation()}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          menuPosition
+            ? { top: menuPosition.mouseY, left: menuPosition.mouseX }
+            : undefined
+        }
+      >
+        <MenuItem onClick={handleRename}>Rename</MenuItem>
+        <MenuItem onClick={handleCopy}>Copy</MenuItem>
+        <MenuItem onClick={handleDuplicate}>Duplicate</MenuItem>
+        <MenuItem onClick={handleDelete}>Delete</MenuItem>
+      </Menu>
     </Box>
   );
 }

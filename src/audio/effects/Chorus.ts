@@ -5,6 +5,7 @@ import {
   registerEffectParameter,
   type ParameterSetter,
 } from "../effectRefs";
+import { coerceBoolean, readParamBoolean } from "../parameterUtils";
 
 const MAX_CHORUS_MS = 80;
 const CHORUS_BUFFER_SAMPLES = Math.ceil(44.1 * MAX_CHORUS_MS);
@@ -21,18 +22,17 @@ class Chorus extends Base {
   constructor(id: string, core: any, parameters: Record<string, any> = {}) {
     super(id);
     this.mix = parameters.mix?.value ?? 0.5;
-    this.active = parameters.active?.value ?? true;
+    this.active = readParamBoolean(parameters, "active", true);
 
-    const effectiveMix = this.active ? this.mix : 0;
     this.dryRef = createEffectParamRef(
       core,
       `chorus-${id}-dry`,
-      1 - effectiveMix
+      1 - this.mix
     );
     this.wetRef = createEffectParamRef(
       core,
       `chorus-${id}-wet`,
-      effectiveMix
+      this.mix
     );
     this.rateRef = createEffectParamRef(
       core,
@@ -53,12 +53,12 @@ class Chorus extends Base {
 
   registerParameterSetters(
     setters: Map<string, ParameterSetter>,
-    parameters: Record<string, any>
+    parameters: Record<string, any>,
+    requestRender?: () => void
   ) {
     const updateMix = async () => {
-      const wet = this.active ? this.mix : 0;
-      await this.wetRef.setValue({ value: wet });
-      await this.dryRef.setValue({ value: 1 - wet });
+      await this.wetRef.setValue({ value: this.mix });
+      await this.dryRef.setValue({ value: 1 - this.mix });
     };
 
     registerEffectParameter(setters, parameters.mix, async (value) => {
@@ -78,13 +78,17 @@ class Chorus extends Base {
       await this.timeRef.setValue({ value });
     });
 
-    registerEffectParameter(setters, parameters.active, async (value) => {
-      this.active = value;
-      await updateMix();
+    registerEffectParameter(setters, parameters.active, (value) => {
+      this.active = coerceBoolean(value, this.active);
+      requestRender?.();
     });
   }
 
   render(signal: any) {
+    if (!this.active) {
+      return signal;
+    }
+
     const lfo = el.cycle({ key: `chorus-${this.id}-lfo` }, this.rateRef.node);
     const noFeedback = el.const({ key: `chorus-${this.id}-fb`, value: 0 });
     const half = el.const({ key: `chorus-${this.id}-half`, value: 0.5 });

@@ -9,11 +9,10 @@ import LowPassFilter from "./effects/LowPassFilter.js";
 import HighPassFilter from "./effects/HighPassFilter.js";
 import Delay from "./effects/Delay";
 import Reverb from "./effects/Reverb";
-import Velocity from "./midiEffects/Velocity.js";
 import DrumRack from "./instruments/DrumRack.js";
 import DrumSynth from "./instruments/DrumSynth";
 import Simpler from "./instruments/Simpler";
-import Distortion from "./effects/Distortion";
+import Drive from "./effects/Drive";
 import Tremolo from "./effects/Tremolo";
 import Chorus from "./effects/Chorus";
 import {
@@ -25,6 +24,10 @@ import {
 interface Config {
   tracks: any[]
   masterGain?: number
+}
+
+interface EngineOptions {
+  onRequestRender?: () => void
 }
 
 type ChannelEntry = {
@@ -41,9 +44,11 @@ class Engine {
   masterGainRef: EffectParamRef
   masterGainSetter: ParameterSetter
   core: any
+  private onRequestRender?: () => void
 
-  constructor(config: Config, core: any) {
+  constructor(config: Config, core: any, options: EngineOptions = {}) {
     this.core = core;
+    this.onRequestRender = options.onRequestRender;
     this.channels = {};
     this.parameterSetters = new Map();
     this.trackGainSetters = new Map();
@@ -111,8 +116,9 @@ class Engine {
         instance = new Delay(effect.id, this.core, effect.parameters);
         break;
       }
+      case "drive":
       case "distortion": {
-        instance = new Distortion(effect.id, this.core, effect.parameters);
+        instance = new Drive(effect.id, this.core, effect.parameters);
         break;
       }
       case "tremolo": {
@@ -132,20 +138,37 @@ class Engine {
         return null;
       }
     }
-    instance?.registerParameterSetters?.(
-      this.parameterSetters,
-      effect.parameters ?? {}
-    );
+    this.registerParameterSetters(instance, effect.parameters ?? {});
     return instance;
   }
 
+  private registerParameterSetters(
+    instance: { registerParameterSetters?: (
+      setters: Map<string, ParameterSetter>,
+      parameters: Record<string, any>,
+      requestRender?: () => void
+    ) => void } | null,
+    parameters: Record<string, any>
+  ) {
+    instance?.registerParameterSetters?.(
+      this.parameterSetters,
+      parameters,
+      () => this.onRequestRender?.()
+    );
+  }
+
   private createInstrument(instrument: any) {
+    const parameters = instrument.parameters ?? {};
     switch (instrument?.type) {
       case "synth": {
-        return new Synth(instrument.id, this.core);
+        const instance = new Synth(instrument.id, this.core, parameters);
+        this.registerParameterSetters(instance, parameters);
+        return instance;
       }
       case "rhodes": {
-        return new Rhodes(instrument.id, this.core);
+        const instance = new Rhodes(instrument.id, this.core, parameters);
+        this.registerParameterSetters(instance, parameters);
+        return instance;
       }
       case "drumRack": {
         return new DrumRack(instrument.id, instrument.config, this.core);

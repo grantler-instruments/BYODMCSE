@@ -5,6 +5,7 @@ import {
   registerEffectParameter,
   type ParameterSetter,
 } from "../effectRefs";
+import { coerceBoolean, readParamBoolean } from "../parameterUtils";
 
 class Tremolo extends Base {
   private dryRef: ReturnType<typeof createEffectParamRef>;
@@ -17,18 +18,17 @@ class Tremolo extends Base {
   constructor(id: string, core: any, parameters: Record<string, any> = {}) {
     super(id);
     this.mix = parameters.mix?.value ?? 0.5;
-    this.active = parameters.active?.value ?? true;
+    this.active = readParamBoolean(parameters, "active", true);
 
-    const effectiveMix = this.active ? this.mix : 0;
     this.dryRef = createEffectParamRef(
       core,
       `tremolo-${id}-dry`,
-      1 - effectiveMix
+      1 - this.mix
     );
     this.wetRef = createEffectParamRef(
       core,
       `tremolo-${id}-wet`,
-      effectiveMix
+      this.mix
     );
     this.rateRef = createEffectParamRef(
       core,
@@ -44,12 +44,12 @@ class Tremolo extends Base {
 
   registerParameterSetters(
     setters: Map<string, ParameterSetter>,
-    parameters: Record<string, any>
+    parameters: Record<string, any>,
+    requestRender?: () => void
   ) {
     const updateMix = async () => {
-      const wet = this.active ? this.mix : 0;
-      await this.wetRef.setValue({ value: wet });
-      await this.dryRef.setValue({ value: 1 - wet });
+      await this.wetRef.setValue({ value: this.mix });
+      await this.dryRef.setValue({ value: 1 - this.mix });
     };
 
     registerEffectParameter(setters, parameters.mix, async (value) => {
@@ -65,13 +65,17 @@ class Tremolo extends Base {
       await this.depthRef.setValue({ value });
     });
 
-    registerEffectParameter(setters, parameters.active, async (value) => {
-      this.active = value;
-      await updateMix();
+    registerEffectParameter(setters, parameters.active, (value) => {
+      this.active = coerceBoolean(value, this.active);
+      requestRender?.();
     });
   }
 
   render(signal: any) {
+    if (!this.active) {
+      return signal;
+    }
+
     const lfo = el.cycle({ key: `tremolo-${this.id}-lfo` }, this.rateRef.node);
     const trem = el.add(
       el.const({ key: `tremolo-${this.id}-unity`, value: 1 }),

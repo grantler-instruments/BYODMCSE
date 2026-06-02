@@ -8,20 +8,15 @@ import Track from "./Track";
 
 function Tracks() {
   const tracks = useLiveSetStore((state) => state.tracks);
+  const selectedTrackId = useLiveSetStore((state) => state.selectedTrackId);
   const setSelectedTrackId = useLiveSetStore(
     (state) => state.setSelectedTrackId
   );
-  const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null);
   const [addTrackOpen, setAddTrackOpen] = useState(false);
 
   const toggleExpand = (trackId: string) => {
-    setExpandedTrackId((current) => {
-      const next = current === trackId ? null : trackId;
-      if (next) {
-        setSelectedTrackId(trackId);
-      }
-      return next;
-    });
+    const current = useLiveSetStore.getState().selectedTrackId;
+    setSelectedTrackId(current === trackId ? null : trackId);
   };
 
   return (
@@ -53,7 +48,7 @@ function Tracks() {
           <Track
             key={track.id}
             track={track}
-            expanded={expandedTrackId === track.id}
+            expanded={selectedTrackId === track.id}
             onToggleExpand={() => toggleExpand(track.id)}
           />
         ))}

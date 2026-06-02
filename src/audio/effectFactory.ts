@@ -1,9 +1,10 @@
 import { v4 as uuidv4 } from "uuid";
+import { DRIVE_MODES, DRIVE_MODE_PRESETS } from "./drivePresets";
 import { reidParameters } from "./trackFactory";
 
 export type EffectType =
   | "delay"
-  | "distortion"
+  | "drive"
   | "tremolo"
   | "chorus"
   | "reverb"
@@ -14,7 +15,7 @@ export const EFFECT_OPTIONS: { type: EffectType; label: string }[] = [
   { type: "delay", label: "Delay" },
   { type: "reverb", label: "Reverb" },
   { type: "chorus", label: "Chorus" },
-  { type: "distortion", label: "Distortion" },
+  { type: "drive", label: "Drive" },
   { type: "tremolo", label: "Tremolo" },
   { type: "lowPassFilter", label: "Low Pass" },
   { type: "highPassFilter", label: "High Pass" },
@@ -49,21 +50,33 @@ const effectTemplates: Record<
       },
     },
   },
-  distortion: {
-    name: "Distortion",
-    type: "distortion",
+  drive: {
+    name: "Drive",
+    type: "drive",
     parameters: {
       active: { id: "", name: "Active", value: true },
+      mode: {
+        id: "",
+        name: "Mode",
+        value: "overdrive",
+        options: DRIVE_MODES,
+      },
       drive: {
         id: "",
         name: "Drive",
-        value: 1.2,
-        options: { min: 0, max: 2 },
+        value: DRIVE_MODE_PRESETS.overdrive.drive,
+        options: { min: 0, max: 15 },
+      },
+      tone: {
+        id: "",
+        name: "Tone",
+        value: DRIVE_MODE_PRESETS.overdrive.tone,
+        options: { min: 500, max: 12000 },
       },
       mix: {
         id: "",
         name: "Mix",
-        value: 0.5,
+        value: DRIVE_MODE_PRESETS.overdrive.mix,
         options: { min: 0, max: 1 },
       },
     },

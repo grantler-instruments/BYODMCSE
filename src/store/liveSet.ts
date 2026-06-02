@@ -8,6 +8,11 @@ import axios from "axios";
 import { loadSample, map } from "../audio/utils";
 import Engine from "../audio/Engine";
 import {
+  applyDriveModePreset,
+  isDriveMode,
+  normalizeDriveEffect,
+} from "../audio/drivePresets";
+import {
   createEffect,
   type EffectType,
 } from "../audio/effectFactory";
@@ -27,6 +32,7 @@ import {
   type MqttStatus,
 } from "./mqttSettings";
 import { v4 as uuidv4 } from "uuid";
+import { reidParameters } from "../audio/trackFactory";
 
 interface State {
   config: any;
@@ -61,6 +67,9 @@ interface State {
   setSelectedTrackId: (trackId: string | null) => void;
   setTrackGain: (trackId: string, gain: number) => void;
   setTrackMidiChannel: (trackId: string, midiChannel: number) => void;
+  renameTrack: (trackId: string, name: string) => void;
+  duplicateTrack: (trackId: string) => Promise<void>;
+  deleteTrack: (trackId: string) => Promise<void>;
   setMasterGain: (gain: number) => void;
   addTrack: (
     instrumentType: InstrumentType,
@@ -68,6 +77,11 @@ interface State {
     name?: string
   ) => void;
   addEffect: (trackId: string, effectType: EffectType) => void;
+  reorderEffects: (
+    trackId: string,
+    fromIndex: number,
+    toIndex: number
+  ) => Promise<void>;
   saveNewSet: (name: string) => void;
   updateActiveSet: (name?: string) => void;
   saveCurrentSet: () => void;
@@ -82,7 +96,24 @@ function normalizeTracks(tracks: any[]) {
   return tracks.map((track) => ({
     ...track,
     gain: track.gain ?? 1,
+    effects: (track.effects ?? []).map(normalizeDriveEffect),
   }));
+}
+
+function cloneTrackWithFreshIds(track: any) {
+  const cloned = reidParameters(
+    JSON.parse(JSON.stringify(track))
+  ) as any;
+  cloned.id = uuidv4();
+  if (cloned.instrument) {
+    cloned.instrument.id = uuidv4();
+  }
+  cloned.effects = (cloned.effects ?? []).map((effect: any) => ({
+    ...effect,
+    id: uuidv4(),
+  }));
+  cloned.name = `${track.name} Copy`;
+  return cloned;
 }
 
 let ctx: AudioContext;
@@ -197,6 +228,7 @@ async function connectMqttAsync(get: LiveSetGetter, set: LiveSetSetter) {
   set({
     mqttSettings: { ...get().mqttSettings, autoConnect: true },
   });
+  syncActiveSetMqtt(get, set);
 
   try {
     if (mqttMidi) {
@@ -256,6 +288,7 @@ async function connectMqttAsync(get: LiveSetGetter, set: LiveSetSetter) {
     await client.connect();
     mqttMidi = client;
     set({ mqttStatus: "connected", mqttError: null });
+    syncActiveSetMqtt(get, set);
     autoSaveDraft(get, set, true);
   } catch (err) {
     console.error("MQTT MIDI connect failed:", err);
@@ -353,7 +386,8 @@ const useLiveSetStore = create<State>()(
             core.updateVirtualFileSystem(files);
             const engine = new Engine(
               { tracks: get().tracks, masterGain: get().masterGain },
-              core
+              core,
+              { onRequestRender: () => get().render() }
             );
             try {
               await commitRender(engine);
@@ -377,7 +411,8 @@ const useLiveSetStore = create<State>()(
           try {
             const engine = new Engine(
               { tracks: get().tracks, masterGain: get().masterGain },
-              core
+              core,
+              { onRequestRender: () => get().render() }
             );
             await commitRender(engine);
             set({ engine, loading: false, armedTracks: [], selectedTrackId: null });
@@ -409,6 +444,8 @@ const useLiveSetStore = create<State>()(
         },
         setParameterValue(id: string, value: any) {
           const tracks = [...get().tracks];
+          const engineUpdates: Array<[string, any]> = [[id, value]];
+
           for (const track of tracks) {
             const keys = Object.keys(track?.instrument.parameters);
             keys.forEach((key) => {
@@ -421,12 +458,24 @@ const useLiveSetStore = create<State>()(
               keys.forEach((key) => {
                 if (effect.parameters[key]?.id === id) {
                   effect.parameters[key].value = value;
+
+                  if (
+                    effect.type === "drive" &&
+                    key === "mode" &&
+                    isDriveMode(value)
+                  ) {
+                    for (const update of applyDriveModePreset(effect, value)) {
+                      engineUpdates.push([update.id, update.value]);
+                    }
+                  }
                 }
               });
             }
           }
           set({ tracks });
-          get().engine?.setParameter(id, value);
+          for (const [paramId, paramValue] of engineUpdates) {
+            get().engine?.setParameter(paramId, paramValue);
+          }
           autoSaveDraft(get, set);
         },
         getParameterValue(deviceId: string, parameterKey: string) {
@@ -466,6 +515,7 @@ const useLiveSetStore = create<State>()(
               ...settings,
             },
           });
+          syncActiveSetMqtt(get, set);
           autoSaveDraft(get, set, true);
         },
         connectMqtt: () => {
@@ -510,6 +560,49 @@ const useLiveSetStore = create<State>()(
           set({ tracks });
           get().engine?.setTrackMidiChannel(trackId, midiChannel);
           autoSaveDraft(get, set);
+        },
+        renameTrack: (trackId: string, name: string) => {
+          const trimmedName = name.trim();
+          if (!trimmedName) return;
+          const tracks = get().tracks.map((track) =>
+            track.id === trackId ? { ...track, name: trimmedName } : track
+          );
+          set({ tracks });
+          autoSaveDraft(get, set, true);
+        },
+        duplicateTrack: async (trackId: string) => {
+          const previousTracks = get().tracks;
+          const track = previousTracks.find((item) => item.id === trackId);
+          if (!track) return;
+
+          const clonedTrack = cloneTrackWithFreshIds(track);
+          const index = previousTracks.findIndex((item) => item.id === trackId);
+          const tracks = [...previousTracks];
+          tracks.splice(index + 1, 0, clonedTrack);
+
+          set({ tracks, selectedTrackId: clonedTrack.id });
+          autoSaveDraft(get, set, true);
+
+          if (get().engine) {
+            await get().rebuildEngine();
+            set({ selectedTrackId: clonedTrack.id });
+          }
+        },
+        deleteTrack: async (trackId: string) => {
+          const previousTracks = get().tracks;
+          if (!previousTracks.some((item) => item.id === trackId)) return;
+
+          const tracks = previousTracks.filter((item) => item.id !== trackId);
+          const selectedTrackId =
+            get().selectedTrackId === trackId ? null : get().selectedTrackId;
+          const armedTracks = get().armedTracks.filter((id) => id !== trackId);
+
+          set({ tracks, selectedTrackId, armedTracks });
+          autoSaveDraft(get, set, true);
+
+          if (get().engine) {
+            await get().rebuildEngine();
+          }
         },
         setMasterGain: (gain: number) => {
           set({ masterGain: gain });
@@ -573,6 +666,34 @@ const useLiveSetStore = create<State>()(
 
           get().render();
           autoSaveDraft(get, set, true);
+        },
+        reorderEffects: async (trackId: string, fromIndex: number, toIndex: number) => {
+          if (fromIndex === toIndex) return;
+
+          const previousTracks = get().tracks;
+          const tracks = previousTracks.map((track) => {
+            if (track.id !== trackId) return track;
+            const effects = [...(track.effects ?? [])];
+            if (
+              fromIndex < 0 ||
+              toIndex < 0 ||
+              fromIndex >= effects.length ||
+              toIndex >= effects.length
+            ) {
+              return track;
+            }
+            const [moved] = effects.splice(fromIndex, 1);
+            effects.splice(toIndex, 0, moved);
+            return { ...track, effects };
+          });
+
+          set({ tracks });
+          autoSaveDraft(get, set, true);
+
+          if (get().engine) {
+            await get().rebuildEngine();
+            set({ selectedTrackId: trackId });
+          }
         },
         saveNewSet: (name: string) => {
           const trimmed = name.trim();

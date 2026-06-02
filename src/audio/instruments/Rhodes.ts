@@ -2,17 +2,98 @@ import { el } from "@elemaudio/core";
 import { Midi } from "tonal";
 import { v4 } from "uuid";
 import Base from "./Base";
-import useLiveSetStore from "../../store/liveSet";
+import {
+  createEffectParamRef,
+  registerEffectParameter,
+  type ParameterSetter,
+} from "../effectRefs";
+import { readParamNumber } from "../parameterUtils";
 import { createConstRef, createGateRef } from "../voiceRefs";
+
+/** Per-voice gain so polyphonic sums stay below clipping before bus saturation. */
+const VOICE_MIX_GAIN = 0.4;
 
 class Rhodes extends Base {
   voices: any[];
   core: any;
   nextVoice = 0;
 
-  constructor(id: string, core: any) {
+  private attackRef: ReturnType<typeof createEffectParamRef>;
+  private decayRef: ReturnType<typeof createEffectParamRef>;
+  private sustainRef: ReturnType<typeof createEffectParamRef>;
+  private releaseRef: ReturnType<typeof createEffectParamRef>;
+  private bellRef: ReturnType<typeof createEffectParamRef>;
+  private bellRatioRef: ReturnType<typeof createEffectParamRef>;
+  private filterCutoffRef: ReturnType<typeof createEffectParamRef>;
+  private filterEnvRef: ReturnType<typeof createEffectParamRef>;
+  private tremoloRateRef: ReturnType<typeof createEffectParamRef>;
+  private tremoloDepthRef: ReturnType<typeof createEffectParamRef>;
+  private driveRef: ReturnType<typeof createEffectParamRef>;
+
+  constructor(
+    id: string,
+    core: any,
+    parameters: Record<string, any> = {}
+  ) {
     super(id);
     this.core = core;
+
+    this.attackRef = createEffectParamRef(
+      core,
+      `${id}-attack`,
+      readParamNumber(parameters, "attack", 0.002)
+    );
+    this.decayRef = createEffectParamRef(
+      core,
+      `${id}-decay`,
+      readParamNumber(parameters, "decay", 1.4)
+    );
+    this.sustainRef = createEffectParamRef(
+      core,
+      `${id}-sustain`,
+      readParamNumber(parameters, "sustain", 0.42)
+    );
+    this.releaseRef = createEffectParamRef(
+      core,
+      `${id}-release`,
+      readParamNumber(parameters, "release", 0.9)
+    );
+    this.bellRef = createEffectParamRef(
+      core,
+      `${id}-bell`,
+      readParamNumber(parameters, "bell", 65)
+    );
+    this.bellRatioRef = createEffectParamRef(
+      core,
+      `${id}-bellRatio`,
+      readParamNumber(parameters, "bellRatio", 3.2)
+    );
+    this.filterCutoffRef = createEffectParamRef(
+      core,
+      `${id}-filterCutoff`,
+      readParamNumber(parameters, "filterCutoff", 2800)
+    );
+    this.filterEnvRef = createEffectParamRef(
+      core,
+      `${id}-filterEnv`,
+      readParamNumber(parameters, "filterEnv", 0.35)
+    );
+    this.tremoloRateRef = createEffectParamRef(
+      core,
+      `${id}-tremoloRate`,
+      readParamNumber(parameters, "tremoloRate", 4.5)
+    );
+    this.tremoloDepthRef = createEffectParamRef(
+      core,
+      `${id}-tremoloDepth`,
+      readParamNumber(parameters, "tremoloDepth", 0.18)
+    );
+    this.driveRef = createEffectParamRef(
+      core,
+      `${id}-drive`,
+      readParamNumber(parameters, "drive", 1.15)
+    );
+
     this.voices = Array.from({ length: 8 }, (_, index) => {
       const key = `rhodes-v${index + 1}-${v4()}`;
       const gate = createGateRef(core, key);
@@ -34,26 +115,52 @@ class Rhodes extends Base {
     });
   }
 
-  voice = (voice: any) => {
-    const getParameterValue = useLiveSetStore.getState().getParameterValue;
-    const attack = getParameterValue(this.id, "attack");
-    const decay = getParameterValue(this.id, "decay");
-    const sustain = getParameterValue(this.id, "sustain");
-    const release = getParameterValue(this.id, "release");
-    const bell = getParameterValue(this.id, "bell");
-    const bellRatio = getParameterValue(this.id, "bellRatio");
-    const filterCutoff = getParameterValue(this.id, "filterCutoff");
-    const filterEnvAmt = getParameterValue(this.id, "filterEnv");
-    const tremoloRate = getParameterValue(this.id, "tremoloRate");
-    const tremoloDepth = getParameterValue(this.id, "tremoloDepth");
-    const drive = getParameterValue(this.id, "drive");
+  registerParameterSetters(
+    setters: Map<string, ParameterSetter>,
+    parameters: Record<string, any>
+  ) {
+    registerEffectParameter(setters, parameters.attack, async (value) => {
+      await this.attackRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.decay, async (value) => {
+      await this.decayRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.sustain, async (value) => {
+      await this.sustainRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.release, async (value) => {
+      await this.releaseRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.bell, async (value) => {
+      await this.bellRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.bellRatio, async (value) => {
+      await this.bellRatioRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.filterCutoff, async (value) => {
+      await this.filterCutoffRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.filterEnv, async (value) => {
+      await this.filterEnvRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.tremoloRate, async (value) => {
+      await this.tremoloRateRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.tremoloDepth, async (value) => {
+      await this.tremoloDepthRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.drive, async (value) => {
+      await this.driveRef.setValue({ value });
+    });
+  }
 
+  voice = (voice: any) => {
     const ampEnv = el.adsr(
       { key: `rhodes-amp-${voice.key}` },
-      attack,
-      decay,
-      sustain,
-      release,
+      this.attackRef.node,
+      this.decayRef.node,
+      this.sustainRef.node,
+      this.releaseRef.node,
       voice.gateNode
     );
 
@@ -75,18 +182,18 @@ class Rhodes extends Base {
       voice.gateNode
     );
 
-    const bellDepth = bell * 0.1;
+    const bellDepth = el.mul(
+      this.bellRef.node,
+      el.const({ key: `rhodes-bell-scale-${voice.key}`, value: 0.1 })
+    );
 
     const modOsc = el.mul(
       bellEnv,
       el.mul(
-        el.const({ key: `rhodes-bell-depth-${voice.key}`, value: bellDepth }),
+        bellDepth,
         el.cycle(
           { key: `rhodes-mod-${voice.key}` },
-          el.mul(
-            voice.freqNode,
-            el.const({ key: `rhodes-bell-ratio-${voice.key}`, value: bellRatio })
-          )
+          el.mul(voice.freqNode, this.bellRatioRef.node)
         )
       )
     );
@@ -105,47 +212,56 @@ class Rhodes extends Base {
       el.const({ key: `rhodes-body-level-${voice.key}`, value: 0.38 }),
       el.cycle(
         { key: `rhodes-body-${voice.key}` },
-        el.mul(voice.freqNode, el.const({ key: `rhodes-body-ratio-${voice.key}`, value: 2 }))
+        el.mul(
+          voice.freqNode,
+          el.const({ key: `rhodes-body-ratio-${voice.key}`, value: 2 })
+        )
       )
     );
 
     const tone = el.add(
-      el.mul(el.const({ key: `rhodes-fund-level-${voice.key}`, value: 0.62 }), fundamental),
-      el.mul(el.const({ key: `rhodes-tine-level-${voice.key}`, value: 0.28 }), tine),
+      el.mul(
+        el.const({ key: `rhodes-fund-level-${voice.key}`, value: 0.62 }),
+        fundamental
+      ),
+      el.mul(
+        el.const({ key: `rhodes-tine-level-${voice.key}`, value: 0.28 }),
+        tine
+      ),
       body
     );
 
     const raw = el.mul(ampEnv, tone);
 
     const cutoff = el.add(
-      el.const({ key: `rhodes-cutoff-base-${voice.key}`, value: filterCutoff }),
-      el.mul(
-        filterEnv,
-        el.const({
-          key: `rhodes-cutoff-env-${voice.key}`,
-          value: filterEnvAmt * filterCutoff,
-        })
-      )
+      this.filterCutoffRef.node,
+      el.mul(filterEnv, el.mul(this.filterEnvRef.node, this.filterCutoffRef.node))
     );
 
     const filtered = el.lowpass(cutoff, 0.55, raw);
 
-    const lfo = el.cycle({ key: `rhodes-lfo-${voice.key}` }, tremoloRate);
+    const lfo = el.cycle({ key: `rhodes-lfo-${voice.key}` }, this.tremoloRateRef.node);
+    const halfDepth = el.mul(
+      el.const({ key: `rhodes-trem-half-${voice.key}`, value: 0.5 }),
+      this.tremoloDepthRef.node
+    );
     const trem = el.add(
-      el.const({ key: `rhodes-trem-base-${voice.key}`, value: 1 - tremoloDepth / 2 }),
+      el.sub(
+        el.const({ key: `rhodes-trem-one-${voice.key}`, value: 1 }),
+        halfDepth
+      ),
       el.mul(
-        el.const({ key: `rhodes-trem-depth-${voice.key}`, value: tremoloDepth / 2 }),
-        el.add(1, lfo)
+        halfDepth,
+        el.add(el.const({ key: `rhodes-trem-lfo-offset-${voice.key}`, value: 1 }), lfo)
       )
     );
 
-    return el.tanh(
-      el.mul(
-        filtered,
-        trem,
-        voice.velNode,
-        el.const({ key: `rhodes-drive-${voice.key}`, value: drive })
-      )
+    const driven = el.tanh(
+      el.mul(filtered, trem, voice.velNode, this.driveRef.node)
+    );
+    return el.mul(
+      el.const({ key: `rhodes-voice-mix-${voice.key}`, value: VOICE_MIX_GAIN }),
+      driven
     );
   };
 
@@ -199,7 +315,7 @@ class Rhodes extends Base {
     await this.openGate(voice, retrigger);
   }
 
-  noteOff(note: number, velocity: number = 0) {
+  noteOff(note: number, _velocity: number = 0) {
     void this.handleNoteOff(note);
   }
 
@@ -212,7 +328,8 @@ class Rhodes extends Base {
   }
 
   render() {
-    return el.add(...this.voices.map((v) => this.voice(v)));
+    const mixed = el.add(...this.voices.map((v) => this.voice(v)));
+    return el.tanh(mixed);
   }
 }
 

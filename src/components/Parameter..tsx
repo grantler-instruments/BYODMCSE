@@ -6,15 +6,52 @@ import {
   Typography,
   Switch,
 } from "@mui/material";
+import { Knob } from "./Knob";
 import useLiveSetStore from "../store/liveSet";
 
 interface Props {
   parameter: any;
+  variant?: "slider" | "knob";
 }
 
-const Parameter = ({ parameter }: Props) => {
+function knobStep(min: number, max: number) {
+  const range = max - min;
+  if (range <= 1) return 0.001;
+  if (range <= 10) return 0.01;
+  if (range <= 100) return 0.1;
+  return 1;
+}
+
+function formatOptionLabel(option: string) {
+  return option.charAt(0).toUpperCase() + option.slice(1);
+}
+
+function formatParamName(name: string) {
+  return name
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, (char) => char.toUpperCase());
+}
+
+const Parameter = ({ parameter, variant = "slider" }: Props) => {
   const setParameterValue = useLiveSetStore((state) => state.setParameterValue);
   const { value, options, name } = parameter;
+  const min = options?.min ?? 0;
+  const max = options?.max ?? 1;
+
+  if (variant === "knob" && typeof value === "number") {
+    return (
+      <Knob
+        value={value}
+        min={min}
+        max={max}
+        step={knobStep(min, max)}
+        size={56}
+        label={formatParamName(name)}
+        onChange={(newValue: number) => setParameterValue(parameter.id, newValue)}
+      />
+    );
+  }
+
   return (
     <Box
       sx={{
@@ -47,12 +84,12 @@ const Parameter = ({ parameter }: Props) => {
         {typeof value === "number" && (
           <Slider
             value={value}
-            min={options?.min || 0}
-            max={options?.max || 1}
+            min={min}
+            max={max}
             step={0.001}
             sx={{ width: "100%" }}
-            onChange={(event: any) => {
-              setParameterValue(parameter.id, event.target.value);
+            onChange={(_, newValue) => {
+              setParameterValue(parameter.id, newValue);
             }}
           />
         )}
@@ -68,7 +105,7 @@ const Parameter = ({ parameter }: Props) => {
           >
             {options?.map((option: any, index: number) => (
               <MenuItem key={index} value={option}>
-                {option}
+                {formatOptionLabel(option)}
               </MenuItem>
             ))}
           </Select>
@@ -76,8 +113,6 @@ const Parameter = ({ parameter }: Props) => {
       </Box>
     </Box>
   );
-
-  return <pre>{JSON.stringify(parameter, null, 4)}</pre>;
 };
 
 export default Parameter;

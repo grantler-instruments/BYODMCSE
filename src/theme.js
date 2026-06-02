@@ -21,7 +21,8 @@ const theme = createTheme({
     },
     divider: "rgba(255, 255, 255, 0.08)",
     text: {
-      secondary: "rgba(255, 255, 255, 0.6)",
+      primary: "rgba(255, 255, 255, 0.92)",
+      secondary: "rgba(255, 255, 255, 0.65)",
     },
   },
 });

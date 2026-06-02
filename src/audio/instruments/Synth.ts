@@ -2,19 +2,87 @@ import { el } from "@elemaudio/core";
 import { Midi } from "tonal";
 import { v4 } from "uuid";
 import Base from "./Base";
-import useLiveSetStore from "../../store/liveSet";
+import {
+  createEffectParamRef,
+  registerEffectParameter,
+  type ParameterSetter,
+} from "../effectRefs";
+import { readParamNumber, readParamString } from "../parameterUtils";
 import { createConstRef, createGateRef } from "../voiceRefs";
 
-// https://www.youtube.com/watch?v=0voWrxLDnSE
+type Waveform = "sine" | "saw" | "square" | "triangle";
 
 class Synth extends Base {
   voices: any[];
   core: any;
   nextVoice = 0;
 
-  constructor(id: string, core: any) {
+  private attackRef: ReturnType<typeof createEffectParamRef>;
+  private decayRef: ReturnType<typeof createEffectParamRef>;
+  private sustainRef: ReturnType<typeof createEffectParamRef>;
+  private releaseRef: ReturnType<typeof createEffectParamRef>;
+  private amplitudeARef: ReturnType<typeof createEffectParamRef>;
+  private amplitudeBRef: ReturnType<typeof createEffectParamRef>;
+  private amplitudeCRef: ReturnType<typeof createEffectParamRef>;
+
+  private detuneA: number;
+  private detuneB: number;
+  private detuneC: number;
+  private waveformA: Waveform;
+  private waveformB: Waveform;
+  private waveformC: Waveform;
+
+  constructor(
+    id: string,
+    core: any,
+    parameters: Record<string, any> = {}
+  ) {
     super(id);
     this.core = core;
+
+    this.detuneA = readParamNumber(parameters, "detuneA", 2);
+    this.detuneB = readParamNumber(parameters, "detuneB", 4);
+    this.detuneC = readParamNumber(parameters, "detuneC", 2.3);
+    this.waveformA = readParamString(parameters, "waveformA", "sine") as Waveform;
+    this.waveformB = readParamString(parameters, "waveformB", "sine") as Waveform;
+    this.waveformC = readParamString(parameters, "waveformC", "sine") as Waveform;
+
+    this.attackRef = createEffectParamRef(
+      core,
+      `${id}-attack`,
+      readParamNumber(parameters, "attack", 0.1)
+    );
+    this.decayRef = createEffectParamRef(
+      core,
+      `${id}-decay`,
+      readParamNumber(parameters, "decay", 1)
+    );
+    this.sustainRef = createEffectParamRef(
+      core,
+      `${id}-sustain`,
+      readParamNumber(parameters, "sustain", 1)
+    );
+    this.releaseRef = createEffectParamRef(
+      core,
+      `${id}-release`,
+      readParamNumber(parameters, "release", 4)
+    );
+    this.amplitudeARef = createEffectParamRef(
+      core,
+      `${id}-amplitudeA`,
+      readParamNumber(parameters, "amplitudeA", 0.4)
+    );
+    this.amplitudeBRef = createEffectParamRef(
+      core,
+      `${id}-amplitudeB`,
+      readParamNumber(parameters, "amplitudeB", 0.2)
+    );
+    this.amplitudeCRef = createEffectParamRef(
+      core,
+      `${id}-amplitudeC`,
+      readParamNumber(parameters, "amplitudeC", 0.1)
+    );
+
     this.voices = Array.from({ length: 10 }, (_, index) => {
       const key = `synth-v${index + 1}-${v4()}`;
       const gate = createGateRef(core, key);
@@ -42,7 +110,56 @@ class Synth extends Base {
     });
   }
 
-  getWaveform = (waveform: string, frequency: any, key: string) => {
+  registerParameterSetters(
+    setters: Map<string, ParameterSetter>,
+    parameters: Record<string, any>,
+    requestRender?: () => void
+  ) {
+    registerEffectParameter(setters, parameters.attack, async (value) => {
+      await this.attackRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.decay, async (value) => {
+      await this.decayRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.sustain, async (value) => {
+      await this.sustainRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.release, async (value) => {
+      await this.releaseRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.amplitudeA, async (value) => {
+      await this.amplitudeARef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.amplitudeB, async (value) => {
+      await this.amplitudeBRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.amplitudeC, async (value) => {
+      await this.amplitudeCRef.setValue({ value });
+    });
+    registerEffectParameter(setters, parameters.detuneA, (value) => {
+      this.detuneA = value;
+    });
+    registerEffectParameter(setters, parameters.detuneB, (value) => {
+      this.detuneB = value;
+    });
+    registerEffectParameter(setters, parameters.detuneC, (value) => {
+      this.detuneC = value;
+    });
+    registerEffectParameter(setters, parameters.waveformA, (value) => {
+      this.waveformA = value as Waveform;
+      requestRender?.();
+    });
+    registerEffectParameter(setters, parameters.waveformB, (value) => {
+      this.waveformB = value as Waveform;
+      requestRender?.();
+    });
+    registerEffectParameter(setters, parameters.waveformC, (value) => {
+      this.waveformC = value as Waveform;
+      requestRender?.();
+    });
+  }
+
+  getWaveform = (waveform: Waveform, frequency: any, key: string) => {
     switch (waveform) {
       case "sine":
         return el.cycle({ key }, frequency);
@@ -58,58 +175,28 @@ class Synth extends Base {
   };
 
   voice = (voice: any) => {
-    const getParameterValue = useLiveSetStore.getState().getParameterValue;
-    const attack = getParameterValue(this.id, "attack");
-    const decay = getParameterValue(this.id, "decay");
-    const sustain = getParameterValue(this.id, "sustain");
-    const release = getParameterValue(this.id, "release");
     const env = el.adsr(
       { key: `env-${voice.key}` },
-      el.const({ key: `${this.id}-attack`, value: attack }),
-      el.const({ key: `${this.id}-decay`, value: decay }),
-      el.const({ key: `${this.id}-sustain`, value: sustain }),
-      el.const({ key: `${this.id}-release`, value: release }),
+      this.attackRef.node,
+      this.decayRef.node,
+      this.sustainRef.node,
+      this.releaseRef.node,
       voice.gateNode
     );
 
-    const amplitudeA: number = getParameterValue(this.id, "amplitudeA");
-
     const oscA = el.mul(
-      el.const({
-        key: `amplitudeA-${voice.key}`,
-        value: amplitudeA,
-      }),
-      this.getWaveform(
-        getParameterValue(this.id, "waveformA"),
-        voice.freqNodeA,
-        `oscA-${voice.key}`
-      )
+      this.amplitudeARef.node,
+      this.getWaveform(this.waveformA, voice.freqNodeA, `oscA-${voice.key}`)
     );
 
-    const amplitudeB = getParameterValue(this.id, "amplitudeB");
     const oscB = el.mul(
-      el.const({
-        key: `amplitudeB-${voice.key}`,
-        value: amplitudeB,
-      }),
-      this.getWaveform(
-        getParameterValue(this.id, "waveformB"),
-        voice.freqNodeB,
-        `oscB-${voice.key}`
-      )
+      this.amplitudeBRef.node,
+      this.getWaveform(this.waveformB, voice.freqNodeB, `oscB-${voice.key}`)
     );
 
-    const amplitudeC = getParameterValue(this.id, "amplitudeC");
     const oscC = el.mul(
-      el.const({
-        key: `amplitudeC-${voice.key}`,
-        value: amplitudeC,
-      }),
-      this.getWaveform(
-        getParameterValue(this.id, "waveformC"),
-        voice.freqNodeC,
-        `oscC-${voice.key}`
-      )
+      this.amplitudeCRef.node,
+      this.getWaveform(this.waveformC, voice.freqNodeC, `oscC-${voice.key}`)
     );
 
     const signal = el.add(oscA, oscB, oscC);
@@ -121,12 +208,11 @@ class Synth extends Base {
     note: number,
     normalizedVelocity: number
   ) {
-    const getParameterValue = useLiveSetStore.getState().getParameterValue;
     const freq = Midi.midiToFreq(note);
 
-    await voice.setFreqA({ value: freq * getParameterValue(this.id, "detuneA") });
-    await voice.setFreqB({ value: freq * getParameterValue(this.id, "detuneB") });
-    await voice.setFreqC({ value: freq * getParameterValue(this.id, "detuneC") });
+    await voice.setFreqA({ value: freq * this.detuneA });
+    await voice.setFreqB({ value: freq * this.detuneB });
+    await voice.setFreqC({ value: freq * this.detuneC });
     await voice.setVelocity({ value: normalizedVelocity });
 
     voice.note = note;
@@ -171,7 +257,7 @@ class Synth extends Base {
     await this.openGate(voice, retrigger);
   }
 
-  noteOff(note: number, velocity: number = 0) {
+  noteOff(note: number, _velocity: number = 0) {
     void this.handleNoteOff(note);
   }
 
@@ -184,8 +270,7 @@ class Synth extends Base {
   }
 
   render() {
-    const out = el.add(...this.voices.map((v) => this.voice(v)));
-    return out;
+    return el.add(...this.voices.map((v) => this.voice(v)));
   }
 }
 
