@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Box, IconButton, Tooltip, Typography } from "@mui/material";
+import { Box, IconButton, Tooltip } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import Instrument from "./Instrument";
 import Effect from "./Effect";
@@ -150,18 +150,21 @@ function TrackDetails({ children, track, layout = "row" }: Props) {
           width: isStrip ? "100%" : "auto",
         }}
       >
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 1,
-            px: 0.5,
-          }}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={onMidiEffectsDragEnd}
         >
-          <Typography variant="subtitle2" color="primary" fontWeight={600}>
-            MIDI effects
-          </Typography>
+          <SortableContext
+            items={midiEffects.map((e: any) => e.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {midiEffects.map((effect: any) => (
+              <SortableMidiEffectItem key={effect.id} effect={effect} />
+            ))}
+          </SortableContext>
+        </DndContext>
+        <Box sx={{ display: "flex", justifyContent: "center", pt: 0.5 }}>
           <Tooltip title="Add MIDI effect">
             <IconButton
               size="small"
@@ -178,20 +181,6 @@ function TrackDetails({ children, track, layout = "row" }: Props) {
             </IconButton>
           </Tooltip>
         </Box>
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={onMidiEffectsDragEnd}
-        >
-          <SortableContext
-            items={midiEffects.map((e: any) => e.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            {midiEffects.map((effect: any) => (
-              <SortableMidiEffectItem key={effect.id} effect={effect} />
-            ))}
-          </SortableContext>
-        </DndContext>
       </Box>
       {instrument && <Instrument instrument={instrument}></Instrument>}
       <Box
@@ -202,34 +191,6 @@ function TrackDetails({ children, track, layout = "row" }: Props) {
           width: isStrip ? "100%" : "auto",
         }}
       >
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 1,
-            px: 0.5,
-          }}
-        >
-          <Typography variant="subtitle2" color="primary" fontWeight={600}>
-            Effects
-          </Typography>
-          <Tooltip title="Add effect">
-            <IconButton
-              size="small"
-              aria-label="Add effect"
-              onClick={() => setAddEffectOpen(true)}
-              color="primary"
-              sx={{
-                border: 1,
-                borderColor: "divider",
-                borderStyle: "dashed",
-              }}
-            >
-              <AddIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Box>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
