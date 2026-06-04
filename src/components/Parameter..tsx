@@ -6,7 +6,7 @@ import {
   Typography,
   Switch,
 } from "@mui/material";
-import { Knob } from "./Knob";
+import { Knob } from "@grantler-instruments/mui-theme";
 import useLiveSetStore from "../store/liveSet";
 
 interface Props {

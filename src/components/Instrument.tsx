@@ -54,7 +54,7 @@ const Instrument = ({ instrument }: Props) => {
             flexWrap: "wrap",
             gap: 1.5,
             justifyContent: "flex-start",
-            alignItems: "flex-end",
+            alignItems: "flex-start",
           }}
         >
           {numericParams.map(([id, parameter]: any[]) => (

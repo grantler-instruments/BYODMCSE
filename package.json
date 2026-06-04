@@ -19,7 +19,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@grantler-instruments/mqtt-midi": "^0.1.0",
-    "@grantler-instruments/muiTheme": "https://github.com/grantler-instruments/muiTheme/archive/refs/heads/main.tar.gz",
+    "@grantler-instruments/mui-theme": "^0.0.3",
     "@mui/icons-material": "^9.0.1",
     "@mui/material": "^9.0.1",
     "@nick-thompson/drumsynth": "^0.4.0",

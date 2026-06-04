@@ -5,10 +5,11 @@ import {
   TextField,
   Slider,
   Typography,
+  useTheme,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { ChevronLeft, ChevronRight } from "@mui/icons-material";
 import Widget from "./Widget";
-import { primary, secondary } from "../theme";
 
 const keys = [
   { note: "C", color: "white", midi: 60, key: "a" },
@@ -49,30 +50,39 @@ const isTypingTarget = (target: EventTarget | null) =>
   target instanceof HTMLSelectElement ||
   (target instanceof HTMLElement && target.isContentEditable);
 
-const WHITE_KEY = "#f0f0f0";
-const WHITE_KEY_PRESSED = "#9fd4cc";
-const BLACK_KEY = "#1a1a1a";
-const BLACK_KEY_PRESSED = "#3d7a72";
-
-const numberFieldSx = (width: number) => ({
-  width,
-  "& .MuiInputBase-input": {
-    textAlign: "center",
-    fontSize: 14,
-    fontWeight: 600,
-    color: "text.primary",
-    py: 0.75,
-    px: 0.5,
-  },
-  "& .MuiOutlinedInput-root": {
-    bgcolor: "rgba(255, 255, 255, 0.1)",
-    "& fieldset": { borderColor: "rgba(255, 255, 255, 0.25)" },
-    "&:hover fieldset": { borderColor: "rgba(255, 255, 255, 0.4)" },
-    "&.Mui-focused fieldset": { borderColor: secondary },
-  },
-});
-
 const MusicalKeyboard = ({ onKeyPressed, onKeyReleased, compact = false }: Props) => {
+  const theme = useTheme();
+  const { palette } = theme;
+
+  const keyColors = {
+    white: alpha(palette.common.white, 0.9),
+    whitePressed: alpha(palette.primary.main, 0.45),
+    black: palette.background.default,
+    blackPressed: alpha(palette.primary.main, 0.72),
+    borderPressed: palette.primary.main,
+    whiteInset: alpha(palette.primary.main, 0.35),
+    blackInset: alpha(palette.primary.main, 0.55),
+    whiteLabel: alpha(palette.common.black, 0.55),
+    blackLabel: alpha(palette.common.white, 0.85),
+  };
+
+  const numberFieldSx = (width: number) => ({
+    width,
+    "& .MuiInputBase-input": {
+      textAlign: "center",
+      fontSize: 14,
+      fontWeight: 600,
+      color: "text.primary",
+      py: 0.75,
+      px: 0.5,
+    },
+    "& .MuiOutlinedInput-root": {
+      bgcolor: alpha(palette.common.white, 0.08),
+      "& fieldset": { borderColor: alpha(palette.common.white, 0.25) },
+      "&:hover fieldset": { borderColor: alpha(palette.common.white, 0.4) },
+      "&.Mui-focused fieldset": { borderColor: palette.primary.main },
+    },
+  });
   const [octave, setOctave] = useState(0);
   const [velocity, setVelocity] = useState(100);
   const [pressedNotes, setPressedNotes] = useState<Set<number>>(() => new Set());
@@ -266,7 +276,7 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased, compact = false }: Props
           sx={{
             flex: 1,
             minWidth: compact ? 80 : 120,
-            color: secondary,
+            color: "primary.main",
             "& .MuiSlider-thumb": { width: 14, height: 14 },
           }}
         />
@@ -309,8 +319,10 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased, compact = false }: Props
           : whiteKeyOffset;
 
         const isPressed = pressedNotes.has(key.midi);
-        const baseColor = isBlackKey ? BLACK_KEY : WHITE_KEY;
-        const pressedColor = isBlackKey ? BLACK_KEY_PRESSED : WHITE_KEY_PRESSED;
+        const baseColor = isBlackKey ? keyColors.black : keyColors.white;
+        const pressedColor = isBlackKey
+          ? keyColors.blackPressed
+          : keyColors.whitePressed;
 
         return (
           <Box
@@ -326,21 +338,21 @@ const MusicalKeyboard = ({ onKeyPressed, onKeyReleased, compact = false }: Props
               top: isPressed && !isBlackKey ? 3 : 0,
               cursor: "pointer",
               border: isPressed
-                ? `2px solid ${primary}`
-                : "1px solid rgba(0, 0, 0, 0.5)",
+                ? `2px solid ${keyColors.borderPressed}`
+                : `1px solid ${alpha(palette.common.black, 0.5)}`,
               boxSizing: "border-box",
               display: "flex",
               alignItems: "flex-end",
               justifyContent: "center",
-              color: isBlackKey ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.55)",
+              color: isBlackKey ? keyColors.blackLabel : keyColors.whiteLabel,
               fontSize: keyLayout.fontSize,
               flexShrink: 0,
               userSelect: "none",
               transition: "background-color 0.05s, top 0.05s, border-color 0.05s",
               boxShadow: isPressed
                 ? isBlackKey
-                  ? `inset 0 -2px 8px ${primary}`
-                  : `inset 0 2px 6px rgba(42, 157, 143, 0.35)`
+                  ? `inset 0 -2px 8px ${keyColors.blackInset}`
+                  : `inset 0 2px 6px ${keyColors.whiteInset}`
                 : "none",
             }}
             onMouseDown={() => handleMouseDown(key.midi)}
