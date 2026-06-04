@@ -15,6 +15,7 @@ import Simpler from "./instruments/Simpler";
 import Drive from "./effects/Drive";
 import Tremolo from "./effects/Tremolo";
 import Chorus from "./effects/Chorus";
+import GainDelay from "./effects/GainDelay";
 import {
   createEffectParamRef,
   type EffectParamRef,
@@ -168,6 +169,10 @@ class Engine {
       }
       case "reverb": {
         instance = new Reverb(effect.id, this.core, effect.parameters);
+        break;
+      }
+      case "gainDelay": {
+        instance = new GainDelay(effect.id, this.core, effect.parameters);
         break;
       }
       default: {

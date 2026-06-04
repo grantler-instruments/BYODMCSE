@@ -4,6 +4,7 @@ import { reidParameters } from "./trackFactory";
 
 export type EffectType =
   | "delay"
+  | "gainDelay"
   | "drive"
   | "tremolo"
   | "chorus"
@@ -13,6 +14,7 @@ export type EffectType =
 
 export const EFFECT_OPTIONS: { type: EffectType; label: string }[] = [
   { type: "delay", label: "Delay" },
+  { type: "gainDelay", label: "Gain Delay" },
   { type: "reverb", label: "Reverb" },
   { type: "chorus", label: "Chorus" },
   { type: "drive", label: "Drive" },
@@ -47,6 +49,61 @@ const effectTemplates: Record<
         name: "Feedback",
         value: 0.4,
         options: { min: 0, max: 0.95 },
+      },
+    },
+  },
+  gainDelay: {
+    name: "Gain Delay",
+    type: "gainDelay",
+    parameters: {
+      active: { id: "", name: "Active", value: true },
+      time: {
+        id: "",
+        name: "Time",
+        value: 480,
+        options: { min: 40, max: 3000 },
+      },
+      repeats: {
+        id: "",
+        name: "Repeats",
+        value: 0.55,
+        options: { min: 0, max: 0.92 },
+      },
+      swell: {
+        id: "",
+        name: "Swell",
+        value: 0.42,
+        options: { min: 0, max: 1 },
+      },
+      drift: {
+        id: "",
+        name: "Drift",
+        value: 0.38,
+        options: { min: 0, max: 1 },
+      },
+      shimmer: {
+        id: "",
+        name: "Shimmer",
+        value: 0.32,
+        options: { min: 0, max: 1 },
+      },
+      tone: {
+        id: "",
+        name: "Tone",
+        value: 3200,
+        options: { min: 400, max: 12000 },
+      },
+      space: {
+        id: "",
+        name: "Space",
+        value: 0.28,
+        options: { min: 0, max: 1 },
+      },
+      mix: {
+        id: "",
+        name: "Mix",
+        value: 0.45,
+        options: { min: 0, max: 1 },
       },
     },
   },
