@@ -20,6 +20,9 @@ import {
   type EffectParamRef,
   type ParameterSetter,
 } from "./effectRefs";
+import Transpose from "./midiEffects/Transpose";
+import Humanize from "./midiEffects/Humanize";
+import type { MidiEffect, MidiNoteEvent } from "./midiEffects/types";
 
 interface Config {
   tracks: any[]
@@ -34,6 +37,7 @@ type ChannelEntry = {
   trackId: string
   gainRef: EffectParamRef
   instrument: any
+  midiEffects: MidiEffect[]
   effects: any[]
 }
 
@@ -65,7 +69,13 @@ class Engine {
   }
 
   addTrack(track: any): boolean {
-    const { id: trackId, midiChannel, instrument, effects = [] } = track;
+    const {
+      id: trackId,
+      midiChannel,
+      instrument,
+      effects = [],
+      midiEffects = [],
+    } = track;
     const gainRef = createEffectParamRef(
       this.core,
       `track-gain-${trackId}`,
@@ -79,8 +89,13 @@ class Engine {
       trackId,
       gainRef,
       instrument: null as any,
+      midiEffects: [],
       effects: [],
     };
+
+    const midiEffectsRack = midiEffects
+      .map((effect: any) => this.createMidiEffect(effect))
+      .filter(Boolean) as MidiEffect[];
 
     const effectsRack = effects
       .map((effect: any) => this.createEffect(effect))
@@ -88,10 +103,12 @@ class Engine {
 
     const createdInstrument = this.createInstrument(instrument);
     if (!createdInstrument) {
+      midiEffectsRack.forEach((effect) => effect.dispose?.());
       return false;
     }
 
     channelEntry.instrument = createdInstrument;
+    channelEntry.midiEffects = midiEffectsRack;
     channelEntry.effects = effectsRack;
 
     if (!this.channels[midiChannel]) {
@@ -99,6 +116,26 @@ class Engine {
     }
     this.channels[midiChannel].push(channelEntry);
     return true;
+  }
+
+  private createMidiEffect(effect: any): MidiEffect | null {
+    let instance: MidiEffect | null = null;
+    switch (effect.type) {
+      case "transpose": {
+        instance = new Transpose(effect.id, effect.parameters);
+        break;
+      }
+      case "humanize": {
+        instance = new Humanize(effect.id, effect.parameters);
+        break;
+      }
+      default: {
+        console.error(`MIDI effect ${effect.type} not supported`);
+        return null;
+      }
+    }
+    this.registerParameterSetters(instance, effect.parameters ?? {});
+    return instance;
   }
 
   private createEffect(effect: any) {
@@ -196,14 +233,79 @@ class Engine {
   }
 
   noteOn(channel: number, note: number, velocity: number) {
-    this.channels[channel]?.forEach((entry) =>
-      entry.instrument?.noteOn(note, velocity)
-    );
+    this.channels[channel]?.forEach((entry) => {
+      this.processMidiNoteOn(entry, [{ note, velocity }]);
+    });
   }
+
   noteOff(channel: number, note: number, velocity: number = 0) {
-    this.channels[channel]?.forEach((entry) =>
-      entry.instrument?.noteOff(note, velocity)
-    );
+    this.channels[channel]?.forEach((entry) => {
+      this.processMidiNoteOff(entry, [{ note, velocity }]);
+    });
+  }
+
+  private processMidiNoteOn(entry: ChannelEntry, events: MidiNoteEvent[]) {
+    this.runMidiEffectChain(entry, 0, events, (output) => {
+      output.forEach(({ note, velocity }) => {
+        entry.instrument?.noteOn(note, velocity);
+      });
+    });
+  }
+
+  private runMidiEffectChain(
+    entry: ChannelEntry,
+    index: number,
+    events: MidiNoteEvent[],
+    done: (events: MidiNoteEvent[]) => void
+  ) {
+    if (events.length === 0) {
+      return;
+    }
+
+    if (index >= entry.midiEffects.length) {
+      done(events);
+      return;
+    }
+
+    entry.midiEffects[index].handleNoteOn(events, (output) => {
+      this.runMidiEffectChain(entry, index + 1, output, done);
+    });
+  }
+
+  private runMidiEffectChainOff(
+    entry: ChannelEntry,
+    index: number,
+    events: MidiNoteEvent[],
+    done: (events: MidiNoteEvent[]) => void
+  ) {
+    if (events.length === 0) {
+      return;
+    }
+
+    if (index >= entry.midiEffects.length) {
+      done(events);
+      return;
+    }
+
+    entry.midiEffects[index].handleNoteOff(events, (output) => {
+      this.runMidiEffectChainOff(entry, index + 1, output, done);
+    });
+  }
+
+  private processMidiNoteOff(entry: ChannelEntry, events: MidiNoteEvent[]) {
+    this.runMidiEffectChainOff(entry, 0, events, (output) => {
+      output.forEach(({ note, velocity }) => {
+        entry.instrument?.noteOff(note, velocity);
+      });
+    });
+  }
+
+  dispose() {
+    for (const entries of Object.values(this.channels)) {
+      for (const entry of entries) {
+        entry.midiEffects.forEach((effect) => effect.dispose?.());
+      }
+    }
   }
 
   setParameter(parameterId: string, value: any) {
@@ -230,6 +332,17 @@ class Engine {
     if (!instance) return false;
 
     entry.effects.push(instance);
+    return true;
+  }
+
+  addMidiEffect(trackId: string, effect: any): boolean {
+    const entry = this.findChannelEntry(trackId);
+    if (!entry) return false;
+
+    const instance = this.createMidiEffect(effect);
+    if (!instance) return false;
+
+    entry.midiEffects.push(instance);
     return true;
   }
 

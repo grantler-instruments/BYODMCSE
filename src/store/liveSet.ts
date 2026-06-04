@@ -17,6 +17,10 @@ import {
   type EffectType,
 } from "../audio/effectFactory";
 import {
+  createMidiEffect,
+  type MidiEffectType,
+} from "../audio/midiEffectFactory";
+import {
   createTrack,
   type InstrumentType,
 } from "../audio/trackFactory";
@@ -77,7 +81,13 @@ interface State {
     name?: string
   ) => void;
   addEffect: (trackId: string, effectType: EffectType) => void;
+  addMidiEffect: (trackId: string, effectType: MidiEffectType) => void;
   reorderEffects: (
+    trackId: string,
+    fromIndex: number,
+    toIndex: number
+  ) => Promise<void>;
+  reorderMidiEffects: (
     trackId: string,
     fromIndex: number,
     toIndex: number
@@ -97,6 +107,7 @@ function normalizeTracks(tracks: any[]) {
     ...track,
     gain: track.gain ?? 1,
     effects: (track.effects ?? []).map(normalizeDriveEffect),
+    midiEffects: track.midiEffects ?? [],
   }));
 }
 
@@ -109,6 +120,10 @@ function cloneTrackWithFreshIds(track: any) {
     cloned.instrument.id = uuidv4();
   }
   cloned.effects = (cloned.effects ?? []).map((effect: any) => ({
+    ...effect,
+    id: uuidv4(),
+  }));
+  cloned.midiEffects = (cloned.midiEffects ?? []).map((effect: any) => ({
     ...effect,
     id: uuidv4(),
   }));
@@ -168,6 +183,12 @@ function findParameterById(tracks: any[], parameterId: string) {
       if (param?.id === parameterId) return param;
     }
     for (const effect of track.effects ?? []) {
+      for (const key of Object.keys(effect.parameters ?? {})) {
+        const param = effect.parameters[key];
+        if (param?.id === parameterId) return param;
+      }
+    }
+    for (const effect of track.midiEffects ?? []) {
       for (const key of Object.keys(effect.parameters ?? {})) {
         const param = effect.parameters[key];
         if (param?.id === parameterId) return param;
@@ -409,6 +430,7 @@ const useLiveSetStore = create<State>()(
 
           set({ loading: true });
           try {
+            get().engine?.dispose();
             const engine = new Engine(
               { tracks: get().tracks, masterGain: get().masterGain },
               core,
@@ -468,6 +490,14 @@ const useLiveSetStore = create<State>()(
                       engineUpdates.push([update.id, update.value]);
                     }
                   }
+                }
+              });
+            }
+            for (const effect of track.midiEffects ?? []) {
+              const keys = Object.keys(effect.parameters ?? {});
+              keys.forEach((key) => {
+                if (effect.parameters[key]?.id === id) {
+                  effect.parameters[key].value = value;
                 }
               });
             }
@@ -667,6 +697,36 @@ const useLiveSetStore = create<State>()(
           get().render();
           autoSaveDraft(get, set, true);
         },
+        addMidiEffect: (trackId: string, effectType: MidiEffectType) => {
+          const effect = createMidiEffect(effectType);
+          const previousTracks = get().tracks;
+          const tracks = previousTracks.map((track) =>
+            track.id === trackId
+              ? {
+                  ...track,
+                  midiEffects: [...(track.midiEffects ?? []), effect],
+                }
+              : track
+          );
+          set({ tracks });
+
+          const engine = get().engine;
+          if (!engine) {
+            autoSaveDraft(get, set, true);
+            return;
+          }
+
+          const added = engine.addMidiEffect(trackId, effect);
+          if (!added) {
+            set({ tracks: previousTracks });
+            console.error(
+              `Failed to add MIDI effect ${effectType} to track ${trackId}`
+            );
+            return;
+          }
+
+          autoSaveDraft(get, set, true);
+        },
         reorderEffects: async (trackId: string, fromIndex: number, toIndex: number) => {
           if (fromIndex === toIndex) return;
 
@@ -685,6 +745,38 @@ const useLiveSetStore = create<State>()(
             const [moved] = effects.splice(fromIndex, 1);
             effects.splice(toIndex, 0, moved);
             return { ...track, effects };
+          });
+
+          set({ tracks });
+          autoSaveDraft(get, set, true);
+
+          if (get().engine) {
+            await get().rebuildEngine();
+            set({ selectedTrackId: trackId });
+          }
+        },
+        reorderMidiEffects: async (
+          trackId: string,
+          fromIndex: number,
+          toIndex: number
+        ) => {
+          if (fromIndex === toIndex) return;
+
+          const previousTracks = get().tracks;
+          const tracks = previousTracks.map((track) => {
+            if (track.id !== trackId) return track;
+            const midiEffects = [...(track.midiEffects ?? [])];
+            if (
+              fromIndex < 0 ||
+              toIndex < 0 ||
+              fromIndex >= midiEffects.length ||
+              toIndex >= midiEffects.length
+            ) {
+              return track;
+            }
+            const [moved] = midiEffects.splice(fromIndex, 1);
+            midiEffects.splice(toIndex, 0, moved);
+            return { ...track, midiEffects };
           });
 
           set({ tracks });
