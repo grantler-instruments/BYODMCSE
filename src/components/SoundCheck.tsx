@@ -15,12 +15,14 @@ import FileBrowser from "./FileBrowser";
 import SetsLibrary from "./SetsLibrary";
 import MqttPanel from "./MqttPanel";
 import MidiPanel from "./MidiPanel";
+import ActivityPanel from "./ActivityPanel";
 import Keyboard from "./Keyboard";
 import useAppStore from "../store/app";
+import useActivityLogStore from "../store/activityLog";
 
 const DRAWER_WIDTH = 520;
 
-type SidebarPanel = "fileBrowser" | "setsLibrary" | "mqtt" | "midi";
+type SidebarPanel = "fileBrowser" | "setsLibrary" | "mqtt" | "midi" | "activity";
 
 function SoundCheck() {
   const showFileBrowser = useAppStore((state) => state.showFileBrowser);
@@ -31,7 +33,12 @@ function SoundCheck() {
   const setShowMqttPanel = useAppStore((state) => state.setShowMqttPanel);
   const showMidiPanel = useAppStore((state) => state.showMidiPanel);
   const setShowMidiPanel = useAppStore((state) => state.setShowMidiPanel);
+  const showActivityPanel = useAppStore((state) => state.showActivityPanel);
+  const setShowActivityPanel = useAppStore(
+    (state) => state.setShowActivityPanel
+  );
   const setSidebarPanel = useAppStore((state) => state.setSidebarPanel);
+  const addActivityEvent = useActivityLogStore((state) => state.addEvent);
   const showVirtualKeyboard = useAppStore((state) => state.showVirtualKeyboard);
   const initOrchestra = useLiveSetStore((state) => state.init);
   const listenToMidi = useLiveSetStore((state) => state.listenToMidi);
@@ -51,6 +58,8 @@ function SoundCheck() {
         ? "mqtt"
         : showMidiPanel
           ? "midi"
+          : showActivityPanel
+            ? "activity"
           : null;
 
   useEffect(() => {
@@ -97,6 +106,12 @@ function SoundCheck() {
 
   const handleKeyPressed = useCallback(
     (note: number, velocity: number) => {
+      addActivityEvent({
+        source: "keyboard",
+        type: "noteOn",
+        note,
+        velocity,
+      });
       if (!engine) return;
       tracks
         .filter((track) => armedTracks.includes(track.id))
@@ -104,11 +119,17 @@ function SoundCheck() {
           engine.noteOn(track.midiChannel, note, velocity);
         });
     },
-    [engine, tracks, armedTracks]
+    [addActivityEvent, engine, tracks, armedTracks]
   );
 
   const handleKeyReleased = useCallback(
     (note: number, velocity: number) => {
+      addActivityEvent({
+        source: "keyboard",
+        type: "noteOff",
+        note,
+        velocity,
+      });
       if (!engine) return;
       tracks
         .filter((track) => armedTracks.includes(track.id))
@@ -116,7 +137,7 @@ function SoundCheck() {
           engine.noteOff(track.midiChannel, note, velocity);
         });
     },
-    [engine, tracks, armedTracks]
+    [addActivityEvent, engine, tracks, armedTracks]
   );
 
   return (
@@ -251,6 +272,9 @@ function SoundCheck() {
         )}
         {activeSidebarPanel === "midi" && (
           <MidiPanel onClose={() => setShowMidiPanel(false)} />
+        )}
+        {activeSidebarPanel === "activity" && (
+          <ActivityPanel onClose={() => setShowActivityPanel(false)} />
         )}
       </Drawer>
     </Box>

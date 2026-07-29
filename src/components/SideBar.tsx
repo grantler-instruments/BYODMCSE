@@ -12,6 +12,7 @@ import LibraryMusicOutlinedIcon from "@mui/icons-material/LibraryMusicOutlined";
 import PianoOutlinedIcon from "@mui/icons-material/PianoOutlined";
 import SettingsInputComponentOutlinedIcon from "@mui/icons-material/SettingsInputComponentOutlined";
 import SettingsInputAntennaOutlinedIcon from "@mui/icons-material/SettingsInputAntennaOutlined";
+import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import useAppStore from "../store/app";
 import useLiveSetStore from "../store/liveSet";
 
@@ -24,6 +25,7 @@ const SideBar = (_props: Props) => {
   const showSetsLibrary = useAppStore((state) => state.showSetsLibrary);
   const showMqttPanel = useAppStore((state) => state.showMqttPanel);
   const showMidiPanel = useAppStore((state) => state.showMidiPanel);
+  const showActivityPanel = useAppStore((state) => state.showActivityPanel);
   const setSidebarPanel = useAppStore((state) => state.setSidebarPanel);
   const mqttStatus = useLiveSetStore((state) => state.mqttStatus);
   const midiSettings = useLiveSetStore((state) => state.midiSettings);
@@ -166,6 +168,19 @@ const SideBar = (_props: Props) => {
             >
               <SettingsInputComponentOutlinedIcon />
             </Box>
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Incoming activity" placement="right">
+          <IconButton
+            aria-label="Open incoming activity"
+            aria-pressed={showActivityPanel}
+            onClick={() => {
+              setSidebarPanel(showActivityPanel ? null : "activity");
+            }}
+            color={showActivityPanel ? "primary" : "default"}
+            size="large"
+          >
+            <HistoryOutlinedIcon />
           </IconButton>
         </Tooltip>
         <Tooltip title="Virtual keyboard" placement="right">

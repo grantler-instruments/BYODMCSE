@@ -11,8 +11,9 @@ interface State {
   showSetsLibrary: boolean;
   showMqttPanel: boolean;
   showMidiPanel: boolean;
+  showActivityPanel: boolean;
   setSidebarPanel: (
-    panel: "fileBrowser" | "setsLibrary" | "mqtt" | "midi" | null
+    panel: "fileBrowser" | "setsLibrary" | "mqtt" | "midi" | "activity" | null
   ) => void;
   addUser: (uuid: string) => void;
   removeUser: (uuid: string) => void;
@@ -23,6 +24,7 @@ interface State {
   setShowSetsLibrary: (show: boolean) => void;
   setShowMqttPanel: (show: boolean) => void;
   setShowMidiPanel: (show: boolean) => void;
+  setShowActivityPanel: (show: boolean) => void;
 }
 
 const useAppStore = create<State>()(
@@ -36,12 +38,14 @@ const useAppStore = create<State>()(
         showSetsLibrary: false,
         showMqttPanel: false,
         showMidiPanel: false,
+        showActivityPanel: false,
         setSidebarPanel: (panel) => {
           set({
             showFileBrowser: panel === "fileBrowser",
             showSetsLibrary: panel === "setsLibrary",
             showMqttPanel: panel === "mqtt",
             showMidiPanel: panel === "midi",
+            showActivityPanel: panel === "activity",
           });
         },
         // Add a new user to the list of users
@@ -79,6 +83,9 @@ const useAppStore = create<State>()(
         },
         setShowMidiPanel: (show: boolean) => {
           set({ showMidiPanel: show });
+        },
+        setShowActivityPanel: (show: boolean) => {
+          set({ showActivityPanel: show });
         },
       }),
       {

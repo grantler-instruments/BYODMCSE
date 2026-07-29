@@ -44,6 +44,7 @@ import {
 import { parseMqttEndpoint } from "../mqttEndpoint";
 import { v4 as uuidv4 } from "uuid";
 import { reidParameters } from "../audio/trackFactory";
+import useActivityLogStore from "./activityLog";
 
 interface State {
   config: any;
@@ -310,12 +311,31 @@ async function connectMidi(get: LiveSetGetter, set: LiveSetSetter) {
       channel.addListener("noteon", (event) => {
         const engine = get().engine;
         if (event.data[2] === 0) {
+          useActivityLogStore.getState().addEvent({
+            source: "midi",
+            type: "noteOff",
+            channel: channel.number,
+            note: event.note.number,
+          });
           engine?.noteOff(channel.number, event.note.number);
         } else {
+          useActivityLogStore.getState().addEvent({
+            source: "midi",
+            type: "noteOn",
+            channel: channel.number,
+            note: event.note.number,
+            velocity: event.data[2],
+          });
           engine?.noteOn(channel.number, event.note.number, event.data[2]);
         }
       });
       channel.addListener("noteoff", (event) => {
+        useActivityLogStore.getState().addEvent({
+          source: "midi",
+          type: "noteOff",
+          channel: channel.number,
+          note: event.note.number,
+        });
         get().engine?.noteOff(channel.number, event.note.number);
       });
     });
@@ -373,17 +393,43 @@ async function connectMqttAsync(get: LiveSetGetter, set: LiveSetSetter) {
     client.on("noteOn", ({ channel, note, velocity }) => {
       const engine = get().engine;
       if (velocity === 0) {
+        useActivityLogStore.getState().addEvent({
+          source: "mqtt",
+          type: "noteOff",
+          channel,
+          note,
+        });
         engine?.noteOff(channel, note);
       } else {
+        useActivityLogStore.getState().addEvent({
+          source: "mqtt",
+          type: "noteOn",
+          channel,
+          note,
+          velocity,
+        });
         engine?.noteOn(channel, note, velocity);
       }
     });
 
     client.on("noteOff", ({ channel, note }) => {
+      useActivityLogStore.getState().addEvent({
+        source: "mqtt",
+        type: "noteOff",
+        channel,
+        note,
+      });
       get().engine?.noteOff(channel, note);
     });
 
     client.on("controlChange", ({ channel, controller, value }) => {
+      useActivityLogStore.getState().addEvent({
+        source: "mqtt",
+        type: "controlChange",
+        channel,
+        controller,
+        value,
+      });
       const destination = get().mappings[`${channel},${controller}`];
       if (!destination) return;
 
