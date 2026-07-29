@@ -27,10 +27,18 @@ const SideBar = (_props: Props) => {
   const setSidebarPanel = useAppStore((state) => state.setSidebarPanel);
   const mqttStatus = useLiveSetStore((state) => state.mqttStatus);
   const midiSettings = useLiveSetStore((state) => state.midiSettings);
+  const midiError = useLiveSetStore((state) => state.midiError);
   const showVirtualKeyboard = useAppStore((state) => state.showVirtualKeyboard);
   const setShowVirtualKeyboard = useAppStore(
     (state) => state.setShowVirtualKeyboard
   );
+  const midiPermissionDenied =
+    !!midiError &&
+    /(denied|permission|not allowed|security)/i.test(midiError);
+  const midiUnavailable =
+    typeof navigator === "undefined" ||
+    !("requestMIDIAccess" in navigator) ||
+    midiPermissionDenied;
 
   return (
     <Box
@@ -138,7 +146,26 @@ const SideBar = (_props: Props) => {
             color={showMidiPanel || midiSettings.enabled ? "primary" : "default"}
             size="large"
           >
-            <SettingsInputComponentOutlinedIcon />
+            <Box
+              component="span"
+              sx={{
+                position: "relative",
+                display: "flex",
+                "&::after": midiUnavailable
+                  ? {
+                      content: '""',
+                      position: "absolute",
+                      top: "50%",
+                      left: -2,
+                      width: "calc(100% + 4px)",
+                      borderTop: "2px solid currentColor",
+                      transform: "rotate(-45deg)",
+                    }
+                  : undefined,
+              }}
+            >
+              <SettingsInputComponentOutlinedIcon />
+            </Box>
           </IconButton>
         </Tooltip>
         <Tooltip title="Virtual keyboard" placement="right">
