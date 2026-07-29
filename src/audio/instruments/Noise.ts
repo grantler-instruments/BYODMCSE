@@ -2,18 +2,21 @@ import { el } from "@elemaudio/core";
 import { v4 } from "uuid";
 import Base from "./Base";
 import { createGateRef } from "../voiceRefs";
-
 class Noise extends Base {
-  constructor(id, core) {
+  key: string;
+  gate = 0;
+  gateNode: ReturnType<typeof createGateRef>["node"];
+  setGate: ReturnType<typeof createGateRef>["setValue"];
+
+  constructor(id: string, core: any) {
     super(id);
     this.key = `noise-v1-${v4()}`;
     const gate = createGateRef(core, this.key);
-    this.gate = 0;
     this.gateNode = gate.node;
     this.setGate = gate.setValue;
   }
 
-  noteOn(note, velocity) {
+  noteOn(_note: number, _velocity: number) {
     void this.handleNoteOn();
   }
 
@@ -22,7 +25,7 @@ class Noise extends Base {
     this.gate = 1.0;
   }
 
-  noteOff(note, velocity = 0) {
+  noteOff(_note: number, _velocity = 0) {
     void this.handleNoteOff();
   }
 

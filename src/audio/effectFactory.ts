@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import { buildEqBandParameters } from "./eqPresets";
 import { DRIVE_MODES, DRIVE_MODE_PRESETS } from "./drivePresets";
 import { reidParameters } from "./trackFactory";
 
@@ -9,6 +10,7 @@ export type EffectType =
   | "tremolo"
   | "chorus"
   | "reverb"
+  | "eq"
   | "lowPassFilter"
   | "highPassFilter";
 
@@ -18,6 +20,7 @@ export const EFFECT_OPTIONS: { type: EffectType; label: string }[] = [
   { type: "reverb", label: "Reverb" },
   { type: "chorus", label: "Chorus" },
   { type: "drive", label: "Drive" },
+  { type: "eq", label: "EQ" },
   { type: "tremolo", label: "Tremolo" },
   { type: "lowPassFilter", label: "Low Pass" },
   { type: "highPassFilter", label: "High Pass" },
@@ -192,6 +195,20 @@ const effectTemplates: Record<
         value: 0.45,
         options: { min: 0, max: 1 },
       },
+    },
+  },
+  eq: {
+    name: "EQ",
+    type: "eq",
+    parameters: {
+      active: { id: "", name: "Active", value: true },
+      outputGain: {
+        id: "",
+        name: "Output",
+        value: 0,
+        options: { min: -12, max: 12 },
+      },
+      ...buildEqBandParameters(),
     },
   },
   reverb: {

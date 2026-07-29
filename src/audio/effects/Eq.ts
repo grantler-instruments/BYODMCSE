@@ -1,48 +1,75 @@
-import { el } from "@elemaudio/core";
+import { el, ElemNode } from "@elemaudio/core";
 import Base from "./Base";
+import {
+  EQ_BAND_COUNT,
+  EQ_BAND_DEFAULTS,
+  type EqBandType,
+  isEqBandType,
+} from "../eqPresets";
 import {
   createEffectParamRef,
   registerEffectParameter,
   type ParameterSetter,
 } from "../effectRefs";
-import { readParamBoolean, readParamNumber, coerceBoolean } from "../parameterUtils";
+import {
+  coerceBoolean,
+  readParamBoolean,
+  readParamNumber,
+  readParamString,
+} from "../parameterUtils";
 
-class EQ extends Base {
+type BandRefs = {
+  freqRef: ReturnType<typeof createEffectParamRef>;
+  gainRef: ReturnType<typeof createEffectParamRef>;
+  qRef: ReturnType<typeof createEffectParamRef>;
+};
+
+type BandState = {
+  active: boolean;
+  type: EqBandType;
+  refs: BandRefs;
+};
+
+class Eq extends Base {
   private active = true;
-  private lowGainRef: ReturnType<typeof createEffectParamRef>;
-  private midGainRef: ReturnType<typeof createEffectParamRef>;
-  private highGainRef: ReturnType<typeof createEffectParamRef>;
-  private lowFreqRef: ReturnType<typeof createEffectParamRef>;
-  private highFreqRef: ReturnType<typeof createEffectParamRef>;
+  private outputGainRef: ReturnType<typeof createEffectParamRef>;
+  private bands: BandState[];
 
   constructor(id: string, core: any, parameters: Record<string, any> = {}) {
     super(id);
     this.active = readParamBoolean(parameters, "active", true);
-    this.lowGainRef = createEffectParamRef(
+    this.outputGainRef = createEffectParamRef(
       core,
-      `eq-${id}-low-gain`,
-      readParamNumber(parameters, "lowGain", 1)
+      `eq-${id}-output-gain-db`,
+      readParamNumber(parameters, "outputGain", 0)
     );
-    this.midGainRef = createEffectParamRef(
-      core,
-      `eq-${id}-mid-gain`,
-      readParamNumber(parameters, "midGain", 1)
-    );
-    this.highGainRef = createEffectParamRef(
-      core,
-      `eq-${id}-high-gain`,
-      readParamNumber(parameters, "highGain", 1)
-    );
-    this.lowFreqRef = createEffectParamRef(
-      core,
-      `eq-${id}-low-freq`,
-      readParamNumber(parameters, "lowFreq", 200)
-    );
-    this.highFreqRef = createEffectParamRef(
-      core,
-      `eq-${id}-high-freq`,
-      readParamNumber(parameters, "highFreq", 8000)
-    );
+
+    this.bands = Array.from({ length: EQ_BAND_COUNT }, (_, index) => {
+      const n = index + 1;
+      const defaults = EQ_BAND_DEFAULTS[index];
+      const typeValue = readParamString(parameters, `band${n}Type`, defaults.type);
+      return {
+        active: readParamBoolean(parameters, `band${n}Active`, defaults.active),
+        type: isEqBandType(typeValue) ? typeValue : defaults.type,
+        refs: {
+          freqRef: createEffectParamRef(
+            core,
+            `eq-${id}-b${n}-freq`,
+            readParamNumber(parameters, `band${n}Freq`, defaults.frequency)
+          ),
+          gainRef: createEffectParamRef(
+            core,
+            `eq-${id}-b${n}-gain-db`,
+            readParamNumber(parameters, `band${n}Gain`, defaults.gain)
+          ),
+          qRef: createEffectParamRef(
+            core,
+            `eq-${id}-b${n}-q`,
+            readParamNumber(parameters, `band${n}Q`, defaults.q)
+          ),
+        },
+      };
+    });
   }
 
   registerParameterSetters(
@@ -54,49 +81,110 @@ class EQ extends Base {
       this.active = coerceBoolean(value, this.active);
       requestRender?.();
     });
-    registerEffectParameter(setters, parameters.lowGain, async (value) => {
-      await this.lowGainRef.setValue({ value });
+
+    registerEffectParameter(setters, parameters.outputGain, async (value) => {
+      await this.outputGainRef.setValue({ value });
     });
-    registerEffectParameter(setters, parameters.midGain, async (value) => {
-      await this.midGainRef.setValue({ value });
-    });
-    registerEffectParameter(setters, parameters.highGain, async (value) => {
-      await this.highGainRef.setValue({ value });
-    });
-    registerEffectParameter(setters, parameters.lowFreq, async (value) => {
-      await this.lowFreqRef.setValue({ value });
-    });
-    registerEffectParameter(setters, parameters.highFreq, async (value) => {
-      await this.highFreqRef.setValue({ value });
+
+    this.bands.forEach((band, index) => {
+      const n = index + 1;
+      registerEffectParameter(setters, parameters[`band${n}Active`], (value) => {
+        band.active = coerceBoolean(value, band.active);
+        requestRender?.();
+      });
+      registerEffectParameter(setters, parameters[`band${n}Type`], (value) => {
+        if (!isEqBandType(value)) return;
+        band.type = value;
+        requestRender?.();
+      });
+      registerEffectParameter(setters, parameters[`band${n}Freq`], async (value) => {
+        await band.refs.freqRef.setValue({ value });
+      });
+      registerEffectParameter(setters, parameters[`band${n}Gain`], async (value) => {
+        await band.refs.gainRef.setValue({ value });
+      });
+      registerEffectParameter(setters, parameters[`band${n}Q`], async (value) => {
+        await band.refs.qRef.setValue({ value });
+      });
     });
   }
 
-  render(signal: any) {
+  private applyBand(signal: ElemNode, bandIndex: number, band: BandState): ElemNode {
+    const { freqRef, qRef, gainRef } = band.refs;
+    const keyBase = `eq-${this.id}-b${bandIndex + 1}`;
+
+    switch (band.type) {
+      case "bell":
+        return el.peak(
+          { key: `${keyBase}-peak` },
+          freqRef.node,
+          qRef.node,
+          gainRef.node,
+          signal
+        );
+      case "lowShelf":
+        return el.lowshelf(
+          { key: `${keyBase}-lowshelf` },
+          freqRef.node,
+          qRef.node,
+          gainRef.node,
+          signal
+        );
+      case "highShelf":
+        return el.highshelf(
+          { key: `${keyBase}-highshelf` },
+          freqRef.node,
+          qRef.node,
+          gainRef.node,
+          signal
+        );
+      case "lowCut":
+        return el.highpass(
+          { key: `${keyBase}-lowcut` },
+          freqRef.node,
+          qRef.node,
+          signal
+        );
+      case "highCut":
+        return el.lowpass(
+          { key: `${keyBase}-highcut` },
+          freqRef.node,
+          qRef.node,
+          signal
+        );
+      case "notch":
+        return el.notch(
+          { key: `${keyBase}-notch` },
+          freqRef.node,
+          qRef.node,
+          signal
+        );
+      case "bandPass":
+        return el.bandpass(
+          { key: `${keyBase}-bandpass` },
+          freqRef.node,
+          qRef.node,
+          signal
+        );
+      default:
+        return signal;
+    }
+  }
+
+  render(signal: ElemNode): ElemNode {
     if (!this.active) {
       return signal;
     }
 
-    const low = el.lowpass(
-      this.lowFreqRef.node,
-      1.41,
-      el.mul(signal, this.lowGainRef.node)
-    );
+    let processed = signal;
+    this.bands.forEach((band, index) => {
+      if (band.active) {
+        processed = this.applyBand(processed, index, band);
+      }
+    });
 
-    const high = el.highpass(
-      this.highFreqRef.node,
-      1.41,
-      el.mul(signal, this.highGainRef.node)
-    );
-
-    const midCenter = el.mul(
-      el.add(this.lowFreqRef.node, this.highFreqRef.node),
-      el.const({ key: `eq-${this.id}-mid-center-scale`, value: 0.5 })
-    );
-
-    const band = el.bandpass(midCenter, 1.41, el.mul(signal, this.midGainRef.node));
-
-    return el.add(low, band, high);
+    return el.mul(processed, el.db2gain(this.outputGainRef.node));
   }
 }
 
-export default EQ;
+export default Eq;

@@ -5,9 +5,7 @@ import { Box } from "@mui/material";
 import "./App.css";
 import Room from "./components/Room";
 import theme from "./theme";
-import SoundCheck from "./components/SoundCheck.tsx";
-import useLiveSetStore from "./store/liveSet";
-import { useEffect } from "react";
+import SoundCheck from "./components/SoundCheck";
 
 const router = createHashRouter([
   {

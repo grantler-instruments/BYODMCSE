@@ -2,10 +2,28 @@ import { el } from "@elemaudio/core";
 import { v4 } from "uuid";
 import Base from "./Base";
 import { createGateRef } from "../voiceRefs";
+
 // https://twitter.com/ubcomposer/status/1647659387396169728?s=46&t=Z3VnznKKxadB7DXpOQN7dg
 
+type TapeVoice = {
+  gate: number;
+  note: number;
+  velocity: number;
+  key: string;
+  gateNode: ReturnType<typeof createGateRef>["node"];
+  setGate: ReturnType<typeof createGateRef>["setValue"];
+};
+
 class TapeNoise extends Base {
-  constructor(id, core) {
+  modulation: {
+    valueTrain: number;
+    noiseAmountRate: number;
+    noiseSignalRate: number;
+    allpassRate: number;
+  };
+  voices: TapeVoice[];
+
+  constructor(id: string, core: any) {
     super(id);
     const key = `tape_noise-v1-${v4()}`;
     const gate = createGateRef(core, key);
@@ -27,7 +45,7 @@ class TapeNoise extends Base {
     ];
   }
 
-  voice = (voice) => {
+  voice = (voice: TapeVoice) => {
     const { key } = voice;
     const { valueTrain, noiseAmountRate, noiseSignalRate, allpassRate } =
       this.modulation;
@@ -83,11 +101,11 @@ class TapeNoise extends Base {
     );
   };
 
-  noteOn(note, velocity) {
+  noteOn(note: number, velocity: number) {
     void this.handleNoteOn(note, velocity);
   }
 
-  async handleNoteOn(note, velocity) {
+  async handleNoteOn(note: number, velocity: number) {
     const voice = this.voices[0];
     voice.note = note;
     voice.velocity = velocity;
@@ -95,7 +113,7 @@ class TapeNoise extends Base {
     voice.gate = 1.0;
   }
 
-  noteOff(note, velocity = 0) {
+  noteOff(_note: number, _velocity = 0) {
     void this.handleNoteOff();
   }
 
@@ -107,8 +125,7 @@ class TapeNoise extends Base {
   }
 
   render() {
-    const out = el.add(...this.voices.map((v) => this.voice(v)));
-    return out;
+    return el.add(...this.voices.map((v) => this.voice(v)));
   }
 }
 

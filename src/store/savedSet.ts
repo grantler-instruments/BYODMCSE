@@ -3,8 +3,9 @@ import {
   parseMqttSettings,
   type MqttSettings,
 } from "./mqttSettings";
+import { normalizeMidiSettings, type MidiSettings } from "./midiSettings";
 
-export type { MqttSettings };
+export type { MidiSettings, MqttSettings };
 
 export interface SavedSet {
   id: string;
@@ -13,6 +14,7 @@ export interface SavedSet {
   masterGain: number;
   mappings: Record<string, unknown>;
   mqtt?: MqttSettings;
+  midi?: MidiSettings;
   updatedAt: string;
 }
 
@@ -21,6 +23,7 @@ export interface SetDraft {
   masterGain: number;
   mappings: Record<string, unknown>;
   mqttSettings: MqttSettings;
+  midiSettings: MidiSettings;
   activeSetId: string | null;
   activeSetName: string | null;
   updatedAt: string;
@@ -31,7 +34,8 @@ export function snapshotSetState(state: {
   masterGain: number;
   mappings: Record<string, unknown>;
   mqttSettings: MqttSettings;
-}): Pick<SavedSet, "tracks" | "masterGain" | "mappings" | "mqtt"> {
+  midiSettings: MidiSettings;
+}): Pick<SavedSet, "tracks" | "masterGain" | "mappings" | "mqtt" | "midi"> {
   return JSON.parse(
     JSON.stringify({
       tracks: state.tracks,
@@ -42,6 +46,7 @@ export function snapshotSetState(state: {
         roomId: state.mqttSettings.roomId || "demo",
         autoConnect: state.mqttSettings.autoConnect !== false,
       },
+      midi: state.midiSettings,
     })
   );
 }
@@ -51,12 +56,14 @@ export function createDraft(state: {
   masterGain: number;
   mappings: Record<string, unknown>;
   mqttSettings: MqttSettings;
+  midiSettings: MidiSettings;
   activeSetId: string | null;
   activeSetName: string | null;
 }): SetDraft {
   return {
     ...snapshotSetState(state),
     mqttSettings: JSON.parse(JSON.stringify(state.mqttSettings)),
+    midiSettings: JSON.parse(JSON.stringify(state.midiSettings)),
     activeSetId: state.activeSetId,
     activeSetName: state.activeSetName,
     updatedAt: new Date().toISOString(),
@@ -69,6 +76,7 @@ export interface ExportedSetFile {
   masterGain: number;
   mappings: Record<string, unknown>;
   mqtt: MqttSettings;
+  midi: MidiSettings;
   connection: {
     broker: string;
     roomId: string;
@@ -83,6 +91,7 @@ export function buildExportPayload(state: {
   mappings: Record<string, unknown>;
   activeSetName: string | null;
   mqttSettings?: Partial<MqttSettings> | null;
+  midiSettings?: Partial<MidiSettings> | null;
   config?: any;
 }): ExportedSetFile {
   const mqtt = normalizeMqttSettings(state.mqttSettings, state.config ?? {});
@@ -91,6 +100,7 @@ export function buildExportPayload(state: {
     masterGain: state.masterGain,
     mappings: state.mappings ?? {},
     mqttSettings: mqtt,
+    midiSettings: normalizeMidiSettings(state.midiSettings),
   });
 
   return {
@@ -99,6 +109,7 @@ export function buildExportPayload(state: {
     masterGain: snapshot.masterGain,
     mappings: snapshot.mappings,
     mqtt: snapshot.mqtt!,
+    midi: snapshot.midi!,
     connection: {
       broker: snapshot.mqtt!.brokerUrl,
       roomId: snapshot.mqtt!.roomId,
@@ -126,6 +137,10 @@ export function parseImportedSet(data: unknown, config: any) {
         ? (obj.mappings as Record<string, unknown>)
         : {},
     mqtt: parseMqttSettings(data, config),
+    midi:
+      obj.midi && typeof obj.midi === "object"
+        ? normalizeMidiSettings(obj.midi as Partial<MidiSettings>)
+        : undefined,
     tracks: obj.tracks,
   };
 }

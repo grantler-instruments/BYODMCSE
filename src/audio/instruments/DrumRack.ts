@@ -1,14 +1,32 @@
-import { el } from "@elemaudio/core";
+import { el, ElemNode } from "@elemaudio/core";
 import { v4 } from "uuid";
 import Base from "./Base";
 import { pulseGate } from "../triggerGate";
 import { createConstRef, createGateRef } from "../voiceRefs";
 
+type DrumRackSampleInput = { path: string };
+
+type DrumRackVoice = DrumRackSampleInput & {
+  gate: number;
+  velocity: number;
+  timestamp?: Date;
+  key: string;
+  gateNode: ElemNode;
+  setGate: (value: { value: number }) => Promise<void>;
+  velNode: ElemNode;
+  setVelocity: (value: { value: number }) => Promise<void>;
+};
+
 class DrumRack extends Base {
-  constructor(id, samples, core) {
+  voices: Record<string, DrumRackVoice>;
+
+  constructor(
+    id: string,
+    samples: Record<string, DrumRackSampleInput>,
+    core: any
+  ) {
     super(id);
-    this.id = id;
-    this.voices = samples;
+    this.voices = samples as Record<string, DrumRackVoice>;
 
     Object.values(this.voices).forEach((voice, index) => {
       voice.gate = 0;
@@ -23,7 +41,7 @@ class DrumRack extends Base {
     });
   }
 
-  voice = (voice) => {
+  voice = (voice: DrumRackVoice) => {
     const out = el.sample(
       { path: voice.path, key: `sample-${voice.key}`, mode: "trigger" },
       voice.gateNode,
@@ -32,12 +50,12 @@ class DrumRack extends Base {
     return el.mul(out, voice.velNode);
   };
 
-  noteOn(note, velocity) {
+  noteOn(note: number, velocity: number) {
     void this.handleNoteOn(note, velocity);
   }
 
-  async handleNoteOn(note, velocity) {
-    const entry = Object.entries(this.voices).find(([key]) => key == note);
+  async handleNoteOn(note: number, velocity: number) {
+    const entry = Object.entries(this.voices).find(([key]) => key == String(note));
     if (!entry) return;
 
     const pad = entry[1];
@@ -48,12 +66,11 @@ class DrumRack extends Base {
     await pulseGate(pad);
   }
 
-  noteOff(note) {}
+  noteOff(_note: number, _velocity = 0) {}
 
   render() {
     const voices = Object.values(this.voices);
-    const out = el.add(...voices.map((voice) => this.voice(voice)));
-    return out;
+    return el.add(...voices.map((voice) => this.voice(voice)));
   }
 }
 

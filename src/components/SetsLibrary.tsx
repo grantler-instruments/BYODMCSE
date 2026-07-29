@@ -29,6 +29,7 @@ function SetsLibrary({ onClose }: Props) {
   const masterGain = useLiveSetStore((state) => state.masterGain);
   const mappings = useLiveSetStore((state) => state.mappings);
   const mqttSettings = useLiveSetStore((state) => state.mqttSettings);
+  const midiSettings = useLiveSetStore((state) => state.midiSettings);
   const config = useLiveSetStore((state) => state.config);
   const savedSets = useLiveSetStore((state) => state.savedSets);
   const activeSetId = useLiveSetStore((state) => state.activeSetId);
@@ -70,6 +71,7 @@ function SetsLibrary({ onClose }: Props) {
       mappings: mappings ?? {},
       activeSetName,
       mqttSettings,
+      midiSettings,
       config,
     });
     downloadJson(exportFilename(activeSetName), payload);
@@ -82,6 +84,7 @@ function SetsLibrary({ onClose }: Props) {
       mappings: set.mappings ?? {},
       activeSetName: set.name,
       mqttSettings: set.mqtt,
+      midiSettings: set.midi,
       config,
     });
     downloadJson(exportFilename(set.name), payload);

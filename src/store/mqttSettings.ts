@@ -48,6 +48,10 @@ export function defaultMqttSettings(config: any): MqttSettings {
   };
 }
 
+export function buildMqttTopicPrefix(settings: MqttSettings): string {
+  return settings.roomId.trim() || "demo";
+}
+
 export function normalizeMqttSettings(
   value: Partial<MqttSettings> | null | undefined,
   config: any
@@ -96,7 +100,6 @@ export function parseMqttSettings(
         : typeof obj.roomId === "string"
           ? obj.roomId
           : undefined;
-
     if (broker || roomId) {
       return normalizeMqttSettings({ brokerUrl: broker, roomId }, config);
     }

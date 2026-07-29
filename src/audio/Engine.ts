@@ -2,20 +2,21 @@ import { el } from "@elemaudio/core";
 // import { Interval, Note, Scale, Midi } from "tonal";
 import Synth from "./instruments/Synth";
 import Rhodes from "./instruments/Rhodes";
-import Noise from "./instruments/Noise.js";
-import TapeNoise from "./instruments/TapeNoise.js";
-import GrainTrain from "./instruments/GrainTrain.js";
-import LowPassFilter from "./effects/LowPassFilter.js";
-import HighPassFilter from "./effects/HighPassFilter.js";
+import Noise from "./instruments/Noise";
+import TapeNoise from "./instruments/TapeNoise";
+import GrainTrain from "./instruments/GrainTrain";
+import LowPassFilter from "./effects/LowPassFilter";
+import HighPassFilter from "./effects/HighPassFilter";
 import Delay from "./effects/Delay";
 import Reverb from "./effects/Reverb";
-import DrumRack from "./instruments/DrumRack.js";
+import DrumRack from "./instruments/DrumRack";
 import DrumSynth from "./instruments/DrumSynth";
 import Simpler from "./instruments/Simpler";
 import Drive from "./effects/Drive";
 import Tremolo from "./effects/Tremolo";
 import Chorus from "./effects/Chorus";
 import GainDelay from "./effects/GainDelay";
+import Eq from "./effects/Eq";
 import {
   createEffectParamRef,
   type EffectParamRef,
@@ -173,6 +174,10 @@ class Engine {
       }
       case "gainDelay": {
         instance = new GainDelay(effect.id, this.core, effect.parameters);
+        break;
+      }
+      case "eq": {
+        instance = new Eq(effect.id, this.core, effect.parameters);
         break;
       }
       default: {

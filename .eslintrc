@@ -9,15 +9,7 @@
     "overrides": [
       {
         "files": ["*.ts", "*.tsx"],
-        "rules": {
-          // specific TypeScript rules
-        }
-      },
-      {
-        "files": ["*.js", "*.jsx"],
-        "rules": {
-          // specific JavaScript rules
-        }
+        "rules": {}
       }
     ],
     "rules": {

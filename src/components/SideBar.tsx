@@ -10,6 +10,7 @@ import {
 import FolderOpenOutlinedIcon from "@mui/icons-material/FolderOpenOutlined";
 import LibraryMusicOutlinedIcon from "@mui/icons-material/LibraryMusicOutlined";
 import PianoOutlinedIcon from "@mui/icons-material/PianoOutlined";
+import SettingsInputComponentOutlinedIcon from "@mui/icons-material/SettingsInputComponentOutlined";
 import SettingsInputAntennaOutlinedIcon from "@mui/icons-material/SettingsInputAntennaOutlined";
 import useAppStore from "../store/app";
 import useLiveSetStore from "../store/liveSet";
@@ -25,7 +26,10 @@ const SideBar = (_props: Props) => {
   const setShowSetsLibrary = useAppStore((state) => state.setShowSetsLibrary);
   const showMqttPanel = useAppStore((state) => state.showMqttPanel);
   const setShowMqttPanel = useAppStore((state) => state.setShowMqttPanel);
+  const showMidiPanel = useAppStore((state) => state.showMidiPanel);
+  const setShowMidiPanel = useAppStore((state) => state.setShowMidiPanel);
   const mqttStatus = useLiveSetStore((state) => state.mqttStatus);
+  const midiSettings = useLiveSetStore((state) => state.midiSettings);
   const showVirtualKeyboard = useAppStore((state) => state.showVirtualKeyboard);
   const setShowVirtualKeyboard = useAppStore(
     (state) => state.setShowVirtualKeyboard
@@ -91,6 +95,7 @@ const SideBar = (_props: Props) => {
             onClick={() => {
               setShowFileBrowser(false);
               setShowMqttPanel(false);
+              setShowMidiPanel(false);
               setShowSetsLibrary(!showSetsLibrary);
             }}
             color={showSetsLibrary ? "primary" : "default"}
@@ -106,6 +111,7 @@ const SideBar = (_props: Props) => {
             onClick={() => {
               setShowSetsLibrary(false);
               setShowMqttPanel(false);
+              setShowMidiPanel(false);
               setShowFileBrowser(!showFileBrowser);
             }}
             color={showFileBrowser ? "primary" : "default"}
@@ -121,6 +127,7 @@ const SideBar = (_props: Props) => {
             onClick={() => {
               setShowFileBrowser(false);
               setShowSetsLibrary(false);
+              setShowMidiPanel(false);
               setShowMqttPanel(!showMqttPanel);
             }}
             color={
@@ -129,6 +136,22 @@ const SideBar = (_props: Props) => {
             size="large"
           >
             <SettingsInputAntennaOutlinedIcon />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="MIDI input settings" placement="right">
+          <IconButton
+            aria-label="Open MIDI input settings"
+            aria-pressed={showMidiPanel}
+            onClick={() => {
+              setShowFileBrowser(false);
+              setShowSetsLibrary(false);
+              setShowMqttPanel(false);
+              setShowMidiPanel(!showMidiPanel);
+            }}
+            color={showMidiPanel || midiSettings.enabled ? "primary" : "default"}
+            size="large"
+          >
+            <SettingsInputComponentOutlinedIcon />
           </IconButton>
         </Tooltip>
         <Tooltip title="Virtual keyboard" placement="right">

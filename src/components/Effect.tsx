@@ -10,6 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import Parameter from "./Parameter.";
+import EqEffect from "./EqEffect";
 import useLiveSetStore from "../store/liveSet";
 
 interface Props {
@@ -31,6 +32,10 @@ const Effect = ({ effect, dragHandleProps }: Props) => {
 
   if (!effect) {
     return <></>;
+  }
+
+  if (effect.type === "eq") {
+    return <EqEffect effect={effect} dragHandleProps={dragHandleProps} />;
   }
 
   const parameters = Object.entries(effect?.parameters ?? {});

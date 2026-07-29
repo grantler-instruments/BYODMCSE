@@ -2,19 +2,7 @@ import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import styled from "@emotion/styled";
 import { Canvas } from "@react-three/fiber";
-import { el } from "@elemaudio/core";
-import { WebMidi } from "webmidi";
-
-import { extractBaseFrequenciesEnergy, map } from "../audio/utils";
-import {
-  Bloom,
-  DepthOfField,
-  EffectComposer,
-  Noise,
-  Vignette,
-} from "@react-three/postprocessing";
-import Particles from "./3d/Particles";
-import { tertiary } from "../theme";
+import { extractBaseFrequenciesEnergy } from "../audio/utils";
 import useLiveSetStore, { core } from "../store/liveSet";
 
 const Container = styled.div`
@@ -32,7 +20,6 @@ let highEnergy = 0;
 
 function Stage() {
   const engine = useLiveSetStore((state) => state.engine);
-  const render = useLiveSetStore((state) => state.render);
   const subscribeToMqtt = useLiveSetStore((state) => state.subscribeToMqtt);
   const roomId = useParams().roomId ?? "demo";
 
@@ -41,10 +28,10 @@ function Stage() {
   }, [roomId, subscribeToMqtt]);
 
   useEffect(() => {
-    core.on("fft", function (e) {
-      const baseFrequencyRange = [20, 200];
-      const midFrequencyRange = [201, 4000];
-      const highFrequencyRange = [4001, 10000];
+    core.on("fft", (e: { data: { real: ArrayLike<number> } }) => {
+      const baseFrequencyRange: [number, number] = [20, 200];
+      const midFrequencyRange: [number, number] = [201, 4000];
+      const highFrequencyRange: [number, number] = [4001, 10000];
       baseEnergy = extractBaseFrequenciesEnergy(
         e.data.real,
         44100,
@@ -61,24 +48,12 @@ function Stage() {
         highFrequencyRange
       );
     });
-  }, [core]);
+  }, []);
 
   return (
     <Container>
       <StyledCanvas>
-        {/* <Particles count={2000} core={core} color={tertiary} /> */}
         <ambientLight intensity={0.5} />
-        {/* <EffectComposer>
-          <DepthOfField
-            focusDistance={0}
-            focalLength={0.02}
-            bokehScale={2}
-            height={480}
-          />
-          <Bloom luminanceThreshold={0} luminanceSmoothing={0.9} height={300} />
-          <Noise opacity={0.02} />
-          <Vignette eskil={false} offset={0.1} darkness={1.1} />
-        </EffectComposer> */}
       </StyledCanvas>
     </Container>
   );

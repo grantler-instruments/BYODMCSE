@@ -28,6 +28,7 @@ import useAppStore from "./app";
 import { createDraft, parseImportedSet, snapshotSetState, type SavedSet, type SetDraft } from "./savedSet";
 import {
   defaultMqttSettings,
+  buildMqttTopicPrefix,
   mergeMqttSettingsForLoad,
   normalizeMqttSettings,
   resolveBrokerUrl,
@@ -35,6 +36,11 @@ import {
   type MqttSettings,
   type MqttStatus,
 } from "./mqttSettings";
+import {
+  defaultMidiSettings,
+  normalizeMidiSettings,
+  type MidiSettings,
+} from "./midiSettings";
 import { v4 as uuidv4 } from "uuid";
 import { reidParameters } from "../audio/trackFactory";
 
@@ -55,6 +61,9 @@ interface State {
   mqttSettings: MqttSettings;
   mqttStatus: MqttStatus;
   mqttError: string | null;
+  midiSettings: MidiSettings;
+  midiInputs: { id: string; name: string }[];
+  midiError: string | null;
   init: () => void;
   start: () => void;
   rebuildEngine: () => Promise<void>;
@@ -68,6 +77,8 @@ interface State {
   connectMqtt: () => void;
   disconnectMqtt: () => Promise<void>;
   reconnectMqtt: () => Promise<void>;
+  setMidiSettings: (settings: Partial<MidiSettings>) => Promise<void>;
+  listenToMidi: () => Promise<void>;
   setSelectedTrackId: (trackId: string | null) => void;
   setTrackGain: (trackId: string, gain: number) => void;
   setTrackMidiChannel: (trackId: string, midiChannel: number) => void;
@@ -99,7 +110,6 @@ interface State {
   newEmptySet: () => Promise<void>;
   importSet: (data: unknown, suggestedName?: string) => Promise<boolean>;
   deleteSet: (id: string) => void;
-  listenToMidi: () => void;
 }
 
 function normalizeTracks(tracks: any[]) {
@@ -134,6 +144,7 @@ function cloneTrackWithFreshIds(track: any) {
 let ctx: AudioContext;
 const core = new WebRenderer();
 let mqttMidi: MqttMidi | null = null;
+let midiEnabled = false;
 let renderChain = Promise.resolve();
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 const AUTO_SAVE_DELAY_MS = 400;
@@ -152,6 +163,7 @@ function autoSaveDraft(get: LiveSetGetter, set: LiveSetSetter, immediate = false
         masterGain: state.masterGain,
         mappings: state.mappings ?? {},
         mqttSettings: state.mqttSettings,
+        midiSettings: state.midiSettings,
         activeSetId: state.activeSetId,
         activeSetName: state.activeSetName,
       }),
@@ -231,10 +243,93 @@ function syncActiveSetMqtt(get: LiveSetGetter, set: LiveSetSetter) {
   });
 }
 
+function syncActiveSetMidi(get: LiveSetGetter, set: LiveSetSetter) {
+  const { activeSetId, midiSettings, savedSets } = get();
+  if (!activeSetId) return;
+
+  set({
+    savedSets: savedSets.map((item) =>
+      item.id === activeSetId
+        ? {
+            ...item,
+            midi: midiSettings,
+            updatedAt: new Date().toISOString(),
+          }
+        : item
+    ),
+  });
+}
+
+function availableMidiInputs() {
+  return WebMidi.inputs.map((input) => ({
+    id: input.id,
+    name: input.name || "Unnamed MIDI input",
+  }));
+}
+
+async function stopMidi(set: LiveSetSetter) {
+  if (midiEnabled) {
+    WebMidi.disable();
+    midiEnabled = false;
+  }
+  set({ midiError: null });
+}
+
+async function connectMidi(get: LiveSetGetter, set: LiveSetSetter) {
+  const settings = get().midiSettings;
+  if (!settings.enabled) {
+    await stopMidi(set);
+    return;
+  }
+
+  try {
+    if (midiEnabled) {
+      WebMidi.disable();
+      midiEnabled = false;
+    }
+    await WebMidi.enable();
+    midiEnabled = true;
+
+    const midiInputs = availableMidiInputs();
+    const input = settings.inputId
+      ? WebMidi.inputs.find((item) => item.id === settings.inputId)
+      : WebMidi.inputs[0];
+
+    set({
+      midiInputs,
+      midiError:
+        settings.inputId && !input
+          ? "The selected MIDI input is unavailable."
+          : null,
+    });
+
+    if (!input) return;
+
+    input.channels.forEach((channel) => {
+      channel.addListener("noteon", (event) => {
+        const engine = get().engine;
+        if (event.data[2] === 0) {
+          engine?.noteOff(channel.number, event.note.number);
+        } else {
+          engine?.noteOn(channel.number, event.note.number, event.data[2]);
+        }
+      });
+      channel.addListener("noteoff", (event) => {
+        get().engine?.noteOff(channel.number, event.note.number);
+      });
+    });
+  } catch (error) {
+    midiEnabled = false;
+    set({
+      midiError: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function connectMqttAsync(get: LiveSetGetter, set: LiveSetSetter) {
   const { mqttSettings, config } = get();
   const brokerUrl = resolveBrokerUrl(config, mqttSettings.brokerUrl);
-  const roomId = mqttSettings.roomId.trim() || "demo";
+  const topicPrefix = buildMqttTopicPrefix(mqttSettings);
 
   if (!brokerUrl) {
     set({
@@ -259,7 +354,7 @@ async function connectMqttAsync(get: LiveSetGetter, set: LiveSetSetter) {
 
     const client = new MqttMidi({
       url: brokerUrl,
-      prefix: `byod/${roomId}`,
+      prefix: topicPrefix,
     });
 
     client.on("noteOn", ({ channel, note, velocity }) => {
@@ -345,6 +440,9 @@ const useLiveSetStore = create<State>()(
         mqttSettings: defaultMqttSettings(config),
         mqttStatus: "disconnected",
         mqttError: null,
+        midiSettings: defaultMidiSettings(),
+        midiInputs: [],
+        midiError: null,
         init: async () => {
           set({ loading: true });
           let params = new URLSearchParams(document.location.search);
@@ -378,6 +476,9 @@ const useLiveSetStore = create<State>()(
             mqttSettings: normalizeMqttSettings(
               draft?.mqttSettings ?? linkedSet?.mqtt,
               baseConfig
+            ),
+            midiSettings: normalizeMidiSettings(
+              draft?.midiSettings ?? linkedSet?.midi
             ),
             activeSetId: draft?.activeSetId ?? activeSetId ?? null,
             activeSetName:
@@ -562,6 +663,16 @@ const useLiveSetStore = create<State>()(
         reconnectMqtt: async () => {
           await get().disconnectMqtt();
           get().connectMqtt();
+        },
+        setMidiSettings: async (settings: Partial<MidiSettings>) => {
+          const midiSettings = normalizeMidiSettings({
+            ...get().midiSettings,
+            ...settings,
+          });
+          set({ midiSettings });
+          syncActiveSetMidi(get, set);
+          autoSaveDraft(get, set, true);
+          await connectMidi(get, set);
         },
         setSelectedTrackId: (selectedTrackId: string | null) => {
           set({ selectedTrackId });
@@ -796,6 +907,7 @@ const useLiveSetStore = create<State>()(
             masterGain: get().masterGain,
             mappings: get().mappings ?? {},
             mqttSettings: get().mqttSettings,
+            midiSettings: get().midiSettings,
           });
           const savedSet: SavedSet = {
             id: uuidv4(),
@@ -826,6 +938,7 @@ const useLiveSetStore = create<State>()(
             masterGain: get().masterGain,
             mappings: get().mappings ?? {},
             mqttSettings: get().mqttSettings,
+            midiSettings: get().midiSettings,
           });
           const savedSet: SavedSet = {
             ...existing,
@@ -863,12 +976,14 @@ const useLiveSetStore = create<State>()(
             get().mqttSettings,
             get().config
           );
+          const midiSettings = normalizeMidiSettings(saved.midi);
 
           set({
             tracks: normalizeTracks(saved.tracks),
             masterGain: saved.masterGain,
             mappings: saved.mappings ?? {},
             mqttSettings,
+            midiSettings,
             activeSetId: saved.id,
             activeSetName: saved.name,
             armedTracks: [],
@@ -883,6 +998,7 @@ const useLiveSetStore = create<State>()(
           if (shouldAutoConnectMqtt(mqttSettings)) {
             get().connectMqtt();
           }
+          await connectMidi(get, set);
 
           autoSaveDraft(get, set, true);
         },
@@ -891,11 +1007,13 @@ const useLiveSetStore = create<State>()(
             ...defaultMqttSettings(get().config),
             autoConnect: false,
           };
+          const midiSettings = defaultMidiSettings();
 
           set({
             tracks: [],
             masterGain: 1,
             mqttSettings,
+            midiSettings,
             activeSetId: null,
             activeSetName: null,
             armedTracks: [],
@@ -907,6 +1025,7 @@ const useLiveSetStore = create<State>()(
           }
 
           await teardownMqttConnection(set);
+          await connectMidi(get, set);
           autoSaveDraft(get, set, true);
         },
         importSet: async (data: unknown, suggestedName?: string) => {
@@ -921,11 +1040,13 @@ const useLiveSetStore = create<State>()(
             get().mqttSettings,
             get().config
           );
+          const midiSettings = normalizeMidiSettings(parsed.midi);
           const snapshot = snapshotSetState({
             tracks,
             masterGain: parsed.masterGain,
             mappings: parsed.mappings,
             mqttSettings,
+            midiSettings,
           });
           const setName =
             (parsed.name ?? suggestedName ?? "Imported set").trim() ||
@@ -942,6 +1063,7 @@ const useLiveSetStore = create<State>()(
             masterGain: parsed.masterGain,
             mappings: parsed.mappings,
             mqttSettings,
+            midiSettings,
             savedSets: [...get().savedSets, savedSet],
             activeSetId: savedSet.id,
             activeSetName: savedSet.name,
@@ -957,6 +1079,7 @@ const useLiveSetStore = create<State>()(
           if (shouldAutoConnectMqtt(mqttSettings)) {
             get().connectMqtt();
           }
+          await connectMidi(get, set);
 
           autoSaveDraft(get, set, true);
           return true;
@@ -974,66 +1097,7 @@ const useLiveSetStore = create<State>()(
           autoSaveDraft(get, set, true);
         },
         listenToMidi: async () => {
-          if (await navigator.requestMIDIAccess()) {
-            WebMidi.enable()
-              .then(() => {
-                console.log("WebMidi enabled!");
-                onEnabled();
-              })
-              .catch((err) => alert(err));
-          }
-
-          function onEnabled() {
-            // Inputs
-            WebMidi.inputs.forEach((input) => {
-              console.log(input.name);
-              input.channels.forEach((channel, index) => {
-                channel.addListener("noteon", (e) => {
-                  const engine = get().engine;
-                  engine?.noteOn(channel.number, e.note.number, e.data[2]);
-                });
-                channel.addListener("noteoff", (e) => {
-                  const engine = get().engine;
-                  engine?.noteOff(channel.number, e.note.number);
-                });
-                channel.addListener("controlchange", (e) => {
-                  const engine = get().engine;
-                  const render = get().render;
-                  // const control = e.controller.number;
-                  // const value = e.value;
-                  // const destination = mappings[control];
-                  // if (destination) {
-                  //   const matchedInstruments = [
-                  //     ...Object.values(engine.channels).filter(
-                  //       (channel) => channel?.instrument?.id === destination.device
-                  //     ),
-                  //   ].map((channel) => channel.instrument);
-                  //   let effects = [];
-                  //   Object.values(engine.channels).forEach((channel) => {
-                  //     effects = effects.concat(channel.effects);
-                  //   });
-                  //   const matchedEffects = effects.filter(
-                  //     (effect) => effect.id === destination.device
-                  //   );
-                  //   [...matchedInstruments, ...matchedEffects].forEach((device) => {
-                  //     if (device.setParameter) {
-                  //       device.setParameter(
-                  //         destination.parameter,
-                  //         map(value, 0, 1, destination.min, destination.max)
-                  //       );
-                  //     }
-                  //   });
-                  // }
-                  // if (engine) {
-                  //   render();
-                  // }
-                });
-              });
-            });
-
-            // Outputs
-            // WebMidi.outputs.forEach((output) => console.log(output.name));
-          }
+          await connectMidi(get, set);
         },
       }),
       {

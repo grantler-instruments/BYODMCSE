@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useLocation, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
+import { useParams } from "react-router-dom";
 import styled from "@emotion/styled";
 import NoSleep from "nosleep.js";
 import Button from "@mui/material/Button";
 import Stage from "./Stage";
-
-import LoopIcon from "@mui/icons-material/Loop";
 import { Box, CircularProgress } from "@mui/material";
 import useLiveSetStore from "../store/liveSet";
 
@@ -21,24 +19,18 @@ const Instructions = styled.div`
   font-size: 24px;
 `;
 
-function useQuery() {
-  const { search } = useLocation();
-  return useMemo(() => new URLSearchParams(search), [search]);
-}
-
 function Room() {
-  const roomId = useParams().roomId || "";
   const engine = useLiveSetStore((state) => state.engine);
   const initOrchestra = useLiveSetStore((state) => state.init);
   const start = useLiveSetStore((state) => state.start);
   const loading = useLiveSetStore((state) => state.loading);
 
   useEffect(() => {
-    initOrchestra();
-  }, []);
+    void initOrchestra();
+  }, [initOrchestra]);
 
   const init = () => {
-    start();
+    void start();
     noSleep.enable();
   };
 
@@ -60,10 +52,10 @@ function Room() {
               width: "75%",
               margin: "auto",
             }}
-            position="absolute"
-            bottom={"100px"}
             disabled={loading}
-            startIcon={loading ? <CircularProgress size={"14px"}></CircularProgress> : null}
+            startIcon={
+              loading ? <CircularProgress size={"14px"}></CircularProgress> : null
+            }
           >
             Enter
           </Button>

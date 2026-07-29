@@ -14,6 +14,7 @@ import SideBar, { SIDEBAR_WIDTH } from "./SideBar";
 import FileBrowser from "./FileBrowser";
 import SetsLibrary from "./SetsLibrary";
 import MqttPanel from "./MqttPanel";
+import MidiPanel from "./MidiPanel";
 import Keyboard from "./Keyboard";
 import useAppStore from "../store/app";
 
@@ -26,6 +27,8 @@ function SoundCheck() {
   const setShowSetsLibrary = useAppStore((state) => state.setShowSetsLibrary);
   const showMqttPanel = useAppStore((state) => state.showMqttPanel);
   const setShowMqttPanel = useAppStore((state) => state.setShowMqttPanel);
+  const showMidiPanel = useAppStore((state) => state.showMidiPanel);
+  const setShowMidiPanel = useAppStore((state) => state.setShowMidiPanel);
   const showVirtualKeyboard = useAppStore((state) => state.showVirtualKeyboard);
   const initOrchestra = useLiveSetStore((state) => state.init);
   const listenToMidi = useLiveSetStore((state) => state.listenToMidi);
@@ -265,6 +268,28 @@ function SoundCheck() {
         }}
       >
         <MqttPanel onClose={() => setShowMqttPanel(false)} />
+      </Drawer>
+
+      <Drawer
+        anchor="left"
+        open={showMidiPanel}
+        onClose={() => setShowMidiPanel(false)}
+        sx={{
+          "& .MuiBackdrop-root": {
+            left: SIDEBAR_WIDTH,
+            width: `calc(100% - ${SIDEBAR_WIDTH}px)`,
+          },
+          "& .MuiDrawer-paper": {
+            left: SIDEBAR_WIDTH,
+            width: DRAWER_WIDTH,
+            boxSizing: "border-box",
+            bgcolor: "background.default",
+            borderRight: 1,
+            borderColor: "divider",
+          },
+        }}
+      >
+        <MidiPanel onClose={() => setShowMidiPanel(false)} />
       </Drawer>
     </Box>
   );

@@ -105,7 +105,7 @@ function MqttPanel({ onClose }: Props) {
           variant={mqttStatus === "connected" ? "filled" : "outlined"}
         />
         <Typography variant="caption" color="text.secondary">
-          Topic prefix: byod/{roomId.trim() || "demo"}
+          Topic prefix: {roomId.trim() || "demo"}
         </Typography>
       </Stack>
 
@@ -134,7 +134,7 @@ function MqttPanel({ onClose }: Props) {
           size="small"
           fullWidth
           placeholder="demo"
-          helperText="MIDI arrives on byod/<room>/out/..."
+          helperText="MIDI arrives on <room>/out/..."
         />
         <Stack direction="row" spacing={1}>
           <Button
