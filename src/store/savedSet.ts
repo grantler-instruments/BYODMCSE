@@ -43,6 +43,8 @@ export function snapshotSetState(state: {
       mappings: state.mappings ?? {},
       mqtt: {
         brokerUrl: state.mqttSettings.brokerUrl,
+        username: state.mqttSettings.username,
+        password: state.mqttSettings.password,
         roomId: state.mqttSettings.roomId || "demo",
         autoConnect: state.mqttSettings.autoConnect !== false,
       },

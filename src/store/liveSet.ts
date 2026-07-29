@@ -41,6 +41,7 @@ import {
   normalizeMidiSettings,
   type MidiSettings,
 } from "./midiSettings";
+import { parseMqttEndpoint } from "../mqttEndpoint";
 import { v4 as uuidv4 } from "uuid";
 import { reidParameters } from "../audio/trackFactory";
 
@@ -339,6 +340,14 @@ async function connectMqttAsync(get: LiveSetGetter, set: LiveSetSetter) {
     return;
   }
 
+  if (!parseMqttEndpoint(brokerUrl)) {
+    set({
+      mqttStatus: "error",
+      mqttError: "Broker URL must use the ws:// or wss:// protocol.",
+    });
+    return;
+  }
+
   set({ mqttStatus: "connecting", mqttError: null });
 
   set({
@@ -355,6 +364,10 @@ async function connectMqttAsync(get: LiveSetGetter, set: LiveSetSetter) {
     const client = new MqttMidi({
       url: brokerUrl,
       prefix: topicPrefix,
+      mqttOptions: {
+        username: mqttSettings.username || undefined,
+        password: mqttSettings.password || undefined,
+      },
     });
 
     client.on("noteOn", ({ channel, note, velocity }) => {

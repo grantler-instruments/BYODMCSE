@@ -1,5 +1,7 @@
 export interface MqttSettings {
   brokerUrl: string;
+  username: string;
+  password: string;
   roomId: string;
   autoConnect?: boolean;
 }
@@ -44,6 +46,8 @@ export function resolveBrokerUrl(config: any, override?: string): string {
 export function defaultMqttSettings(config: any): MqttSettings {
   return {
     brokerUrl: resolveBrokerUrl(config),
+    username: "",
+    password: "",
     roomId: "demo",
   };
 }
@@ -59,6 +63,8 @@ export function normalizeMqttSettings(
   const defaults = defaultMqttSettings(config);
   return {
     brokerUrl: value?.brokerUrl?.trim() ?? defaults.brokerUrl,
+    username: value?.username?.trim() ?? defaults.username,
+    password: value?.password ?? defaults.password,
     roomId: value?.roomId?.trim() || defaults.roomId,
     autoConnect: value?.autoConnect,
   };
