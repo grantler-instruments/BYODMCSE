@@ -161,6 +161,10 @@ function SoundCheck() {
               Sound check
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
+              This will eventually be the entry point for different stages and concert
+              rooms. For now, only the sound check is available.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
               Start the audio engine, then add tracks to build your live set.
             </Typography>
             <Button

@@ -2,6 +2,7 @@ import { createHashRouter, Outlet, RouterProvider } from "react-router-dom";
 import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 import { Box } from "@mui/material";
+import { WorkInProgressBanner } from "@grantler-instruments/mui-theme";
 import "./App.css";
 import Room from "./components/Room";
 import theme from "./theme";
@@ -39,6 +40,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <WorkInProgressBanner />
       <Box
         sx={{
           width: "100vw",
