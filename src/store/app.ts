@@ -11,6 +11,9 @@ interface State {
   showSetsLibrary: boolean;
   showMqttPanel: boolean;
   showMidiPanel: boolean;
+  setSidebarPanel: (
+    panel: "fileBrowser" | "setsLibrary" | "mqtt" | "midi" | null
+  ) => void;
   addUser: (uuid: string) => void;
   removeUser: (uuid: string) => void;
   toggleShowFileBrowser: () => void;
@@ -33,6 +36,14 @@ const useAppStore = create<State>()(
         showSetsLibrary: false,
         showMqttPanel: false,
         showMidiPanel: false,
+        setSidebarPanel: (panel) => {
+          set({
+            showFileBrowser: panel === "fileBrowser",
+            showSetsLibrary: panel === "setsLibrary",
+            showMqttPanel: panel === "mqtt",
+            showMidiPanel: panel === "midi",
+          });
+        },
         // Add a new user to the list of users
         addUser: (uuid: string) => {
           const users = get().users

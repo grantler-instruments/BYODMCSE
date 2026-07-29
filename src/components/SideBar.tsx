@@ -21,13 +21,10 @@ interface Props {}
 
 const SideBar = (_props: Props) => {
   const showFileBrowser = useAppStore((state) => state.showFileBrowser);
-  const setShowFileBrowser = useAppStore((state) => state.setShowFileBrowser);
   const showSetsLibrary = useAppStore((state) => state.showSetsLibrary);
-  const setShowSetsLibrary = useAppStore((state) => state.setShowSetsLibrary);
   const showMqttPanel = useAppStore((state) => state.showMqttPanel);
-  const setShowMqttPanel = useAppStore((state) => state.setShowMqttPanel);
   const showMidiPanel = useAppStore((state) => state.showMidiPanel);
-  const setShowMidiPanel = useAppStore((state) => state.setShowMidiPanel);
+  const setSidebarPanel = useAppStore((state) => state.setSidebarPanel);
   const mqttStatus = useLiveSetStore((state) => state.mqttStatus);
   const midiSettings = useLiveSetStore((state) => state.midiSettings);
   const showVirtualKeyboard = useAppStore((state) => state.showVirtualKeyboard);
@@ -44,6 +41,8 @@ const SideBar = (_props: Props) => {
         flexShrink: 0,
         alignSelf: "stretch",
         height: "100%",
+        position: "relative",
+        zIndex: (theme) => theme.zIndex.drawer + 1,
         display: "flex",
         flexDirection: "column",
         bgcolor: "rgba(0, 0, 0, 0.35)",
@@ -93,10 +92,7 @@ const SideBar = (_props: Props) => {
             aria-label="Open live set library"
             aria-pressed={showSetsLibrary}
             onClick={() => {
-              setShowFileBrowser(false);
-              setShowMqttPanel(false);
-              setShowMidiPanel(false);
-              setShowSetsLibrary(!showSetsLibrary);
+              setSidebarPanel(showSetsLibrary ? null : "setsLibrary");
             }}
             color={showSetsLibrary ? "primary" : "default"}
             size="large"
@@ -109,10 +105,7 @@ const SideBar = (_props: Props) => {
             aria-label="Open file browser"
             aria-pressed={showFileBrowser}
             onClick={() => {
-              setShowSetsLibrary(false);
-              setShowMqttPanel(false);
-              setShowMidiPanel(false);
-              setShowFileBrowser(!showFileBrowser);
+              setSidebarPanel(showFileBrowser ? null : "fileBrowser");
             }}
             color={showFileBrowser ? "primary" : "default"}
             size="large"
@@ -125,10 +118,7 @@ const SideBar = (_props: Props) => {
             aria-label="Open MQTT settings"
             aria-pressed={showMqttPanel}
             onClick={() => {
-              setShowFileBrowser(false);
-              setShowSetsLibrary(false);
-              setShowMidiPanel(false);
-              setShowMqttPanel(!showMqttPanel);
+              setSidebarPanel(showMqttPanel ? null : "mqtt");
             }}
             color={
               showMqttPanel || mqttStatus === "connected" ? "primary" : "default"
@@ -143,10 +133,7 @@ const SideBar = (_props: Props) => {
             aria-label="Open MIDI input settings"
             aria-pressed={showMidiPanel}
             onClick={() => {
-              setShowFileBrowser(false);
-              setShowSetsLibrary(false);
-              setShowMqttPanel(false);
-              setShowMidiPanel(!showMidiPanel);
+              setSidebarPanel(showMidiPanel ? null : "midi");
             }}
             color={showMidiPanel || midiSettings.enabled ? "primary" : "default"}
             size="large"

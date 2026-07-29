@@ -20,6 +20,8 @@ import useAppStore from "../store/app";
 
 const DRAWER_WIDTH = 520;
 
+type SidebarPanel = "fileBrowser" | "setsLibrary" | "mqtt" | "midi";
+
 function SoundCheck() {
   const showFileBrowser = useAppStore((state) => state.showFileBrowser);
   const setShowFileBrowser = useAppStore((state) => state.setShowFileBrowser);
@@ -29,6 +31,7 @@ function SoundCheck() {
   const setShowMqttPanel = useAppStore((state) => state.setShowMqttPanel);
   const showMidiPanel = useAppStore((state) => state.showMidiPanel);
   const setShowMidiPanel = useAppStore((state) => state.setShowMidiPanel);
+  const setSidebarPanel = useAppStore((state) => state.setSidebarPanel);
   const showVirtualKeyboard = useAppStore((state) => state.showVirtualKeyboard);
   const initOrchestra = useLiveSetStore((state) => state.init);
   const listenToMidi = useLiveSetStore((state) => state.listenToMidi);
@@ -40,6 +43,15 @@ function SoundCheck() {
   const loading = useLiveSetStore((state) => state.loading);
   const saveCurrentSet = useLiveSetStore((state) => state.saveCurrentSet);
   const newEmptySet = useLiveSetStore((state) => state.newEmptySet);
+  const activeSidebarPanel: SidebarPanel | null = showFileBrowser
+    ? "fileBrowser"
+    : showSetsLibrary
+      ? "setsLibrary"
+      : showMqttPanel
+        ? "mqtt"
+        : showMidiPanel
+          ? "midi"
+          : null;
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -206,9 +218,10 @@ function SoundCheck() {
 
       <Drawer
         anchor="left"
-        open={showFileBrowser}
-        onClose={() => setShowFileBrowser(false)}
+        open={activeSidebarPanel !== null}
+        onClose={() => setSidebarPanel(null)}
         sx={{
+          left: SIDEBAR_WIDTH,
           "& .MuiBackdrop-root": {
             left: SIDEBAR_WIDTH,
             width: `calc(100% - ${SIDEBAR_WIDTH}px)`,
@@ -223,73 +236,18 @@ function SoundCheck() {
           },
         }}
       >
-        <FileBrowser onClose={() => setShowFileBrowser(false)} />
-      </Drawer>
-
-      <Drawer
-        anchor="left"
-        open={showSetsLibrary}
-        onClose={() => setShowSetsLibrary(false)}
-        sx={{
-          "& .MuiBackdrop-root": {
-            left: SIDEBAR_WIDTH,
-            width: `calc(100% - ${SIDEBAR_WIDTH}px)`,
-          },
-          "& .MuiDrawer-paper": {
-            left: SIDEBAR_WIDTH,
-            width: DRAWER_WIDTH,
-            boxSizing: "border-box",
-            bgcolor: "background.default",
-            borderRight: 1,
-            borderColor: "divider",
-          },
-        }}
-      >
-        <SetsLibrary onClose={() => setShowSetsLibrary(false)} />
-      </Drawer>
-
-      <Drawer
-        anchor="left"
-        open={showMqttPanel}
-        onClose={() => setShowMqttPanel(false)}
-        sx={{
-          "& .MuiBackdrop-root": {
-            left: SIDEBAR_WIDTH,
-            width: `calc(100% - ${SIDEBAR_WIDTH}px)`,
-          },
-          "& .MuiDrawer-paper": {
-            left: SIDEBAR_WIDTH,
-            width: DRAWER_WIDTH,
-            boxSizing: "border-box",
-            bgcolor: "background.default",
-            borderRight: 1,
-            borderColor: "divider",
-          },
-        }}
-      >
-        <MqttPanel onClose={() => setShowMqttPanel(false)} />
-      </Drawer>
-
-      <Drawer
-        anchor="left"
-        open={showMidiPanel}
-        onClose={() => setShowMidiPanel(false)}
-        sx={{
-          "& .MuiBackdrop-root": {
-            left: SIDEBAR_WIDTH,
-            width: `calc(100% - ${SIDEBAR_WIDTH}px)`,
-          },
-          "& .MuiDrawer-paper": {
-            left: SIDEBAR_WIDTH,
-            width: DRAWER_WIDTH,
-            boxSizing: "border-box",
-            bgcolor: "background.default",
-            borderRight: 1,
-            borderColor: "divider",
-          },
-        }}
-      >
-        <MidiPanel onClose={() => setShowMidiPanel(false)} />
+        {activeSidebarPanel === "fileBrowser" && (
+          <FileBrowser onClose={() => setShowFileBrowser(false)} />
+        )}
+        {activeSidebarPanel === "setsLibrary" && (
+          <SetsLibrary onClose={() => setShowSetsLibrary(false)} />
+        )}
+        {activeSidebarPanel === "mqtt" && (
+          <MqttPanel onClose={() => setShowMqttPanel(false)} />
+        )}
+        {activeSidebarPanel === "midi" && (
+          <MidiPanel onClose={() => setShowMidiPanel(false)} />
+        )}
       </Drawer>
     </Box>
   );
