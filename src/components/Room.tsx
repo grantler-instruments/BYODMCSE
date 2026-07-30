@@ -24,9 +24,11 @@ function Room() {
   const initOrchestra = useLiveSetStore((state) => state.init);
   const start = useLiveSetStore((state) => state.start);
   const loading = useLiveSetStore((state) => state.loading);
+  const { stageId } = useParams();
 
   useEffect(() => {
-    void initOrchestra();
+    void initOrchestra(stageId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initOrchestra]);
 
   const init = () => {

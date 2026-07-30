@@ -60,19 +60,12 @@ function MqttPanel({ onClose }: Props) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [username, setUsername] = useState(mqttSettings.username);
   const [password, setPassword] = useState(mqttSettings.password);
-  const [roomId, setRoomId] = useState(mqttSettings.roomId);
 
   useEffect(() => {
     setEndpoint(endpointFromUrl(mqttSettings.brokerUrl));
     setUsername(mqttSettings.username);
     setPassword(mqttSettings.password);
-    setRoomId(mqttSettings.roomId);
-  }, [
-    mqttSettings.brokerUrl,
-    mqttSettings.password,
-    mqttSettings.roomId,
-    mqttSettings.username,
-  ]);
+  }, [mqttSettings.brokerUrl, mqttSettings.password, mqttSettings.username]);
 
   const endpointError = validateMqttEndpoint(endpoint);
 
@@ -83,7 +76,6 @@ function MqttPanel({ onClose }: Props) {
       brokerUrl: buildMqttUrl(endpoint),
       username: username.trim(),
       password,
-      roomId: roomId.trim() || "demo",
     });
     return true;
   };
@@ -161,7 +153,7 @@ function MqttPanel({ onClose }: Props) {
           variant={mqttStatus === "connected" ? "filled" : "outlined"}
         />
         <Typography variant="caption" color="text.secondary">
-          Topic prefix: {roomId.trim() || "demo"}
+          Room: {mqttSettings.roomId}
         </Typography>
       </Stack>
 
@@ -286,18 +278,9 @@ function MqttPanel({ onClose }: Props) {
             </Stack>
           </>
         )}
-        <TextField
-          label="Room ID"
-          value={roomId}
-          onChange={(e) => setRoomId(e.target.value)}
-          onBlur={applySettings}
-          size="small"
-          fullWidth
-          placeholder="demo"
-          helperText="MIDI arrives on <room>/out/..."
-        />
         <Typography variant="caption" color="text.secondary">
-          Connection settings are saved with the current live set.
+          Room follows the set ID — set it in the Sets Library. Connection
+          settings are saved with the current live set.
         </Typography>
       </Stack>
     </Box>

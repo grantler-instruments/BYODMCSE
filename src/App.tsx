@@ -4,6 +4,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import { Box } from "@mui/material";
 import { WorkInProgressBanner } from "@grantler-instruments/mui-theme";
 import "./App.css";
+import Home from "./components/Home";
 import Room from "./components/Room";
 import theme from "./theme";
 import SoundCheck from "./components/SoundCheck";
@@ -26,10 +27,14 @@ const router = createHashRouter([
     children: [
       {
         path: "/",
+        element: <Home />,
+      },
+      {
+        path: "/stage/:stageId/soundcheck",
         element: <SoundCheck />,
       },
       {
-        path: "/rooms/:roomId",
+        path: "/stage/:stageId/live",
         element: <Room />,
       },
     ],

@@ -25,7 +25,15 @@ import {
   type InstrumentType,
 } from "../audio/trackFactory";
 import useAppStore from "./app";
-import { createDraft, parseImportedSet, snapshotSetState, type SavedSet, type SetDraft } from "./savedSet";
+import {
+  createDraft,
+  decodeSetFromFragment,
+  parseImportedSet,
+  slugify,
+  snapshotSetState,
+  type SavedSet,
+  type SetDraft,
+} from "./savedSet";
 import {
   defaultMqttSettings,
   buildMqttTopicPrefix,
@@ -57,7 +65,7 @@ interface State {
   selectedTrackId: string | null;
   masterGain: number;
   savedSets: SavedSet[];
-  draft: SetDraft | null;
+  draftsByStageId: Record<string, SetDraft>;
   activeSetId: string | null;
   activeSetName: string | null;
   mqttSettings: MqttSettings;
@@ -66,7 +74,7 @@ interface State {
   midiSettings: MidiSettings;
   midiInputs: { id: string; name: string }[];
   midiError: string | null;
-  init: () => void;
+  init: (stageId?: string) => Promise<void>;
   start: () => void;
   rebuildEngine: () => Promise<void>;
   render: () => void;
@@ -105,13 +113,16 @@ interface State {
     fromIndex: number,
     toIndex: number
   ) => Promise<void>;
-  saveNewSet: (name: string) => void;
-  updateActiveSet: (name?: string) => void;
-  saveCurrentSet: () => void;
+  forkSet: (newStageId: string) => void;
   loadSet: (id: string) => Promise<void>;
   newEmptySet: () => Promise<void>;
   importSet: (data: unknown, suggestedName?: string) => Promise<boolean>;
   deleteSet: (id: string) => void;
+  deleteStage: (stageId: string) => void;
+}
+
+function roomIdForSetName(name: string | null | undefined): string {
+  return slugify(name ?? "") || "demo";
 }
 
 function normalizeTracks(tracks: any[]) {
@@ -145,6 +156,19 @@ function cloneTrackWithFreshIds(track: any) {
 
 let ctx: AudioContext;
 const core = new WebRenderer();
+
+// Browsers only allow creating/resuming an AudioContext from within a user
+// gesture's callstack. Call this synchronously from the click handler that
+// takes the user into a stage, so the (async) engine setup in start() can
+// reuse an already-unlocked context instead of needing its own button.
+export function primeAudioContext() {
+  if (!ctx) {
+    ctx = new window.AudioContext();
+  }
+  if (ctx.state === "suspended") {
+    void ctx.resume();
+  }
+}
 let mqttMidi: MqttMidi | null = null;
 let midiEnabled = false;
 let renderChain = Promise.resolve();
@@ -159,16 +183,49 @@ type LiveSetSetter = (
 function autoSaveDraft(get: LiveSetGetter, set: LiveSetSetter, immediate = false) {
   const write = () => {
     const state = get();
+    const stageId = state.mqttSettings.roomId;
+    const draft = createDraft({
+      tracks: state.tracks,
+      masterGain: state.masterGain,
+      mappings: state.mappings ?? {},
+      mqttSettings: state.mqttSettings,
+      midiSettings: state.midiSettings,
+      activeSetId: state.activeSetId,
+      activeSetName: state.activeSetName,
+    });
+
+    // Every stage always has exactly one saved set, upserted by stage ID —
+    // there's no manual "save"/"update" step, content just always persists.
+    const snapshot = snapshotSetState({
+      tracks: state.tracks,
+      masterGain: state.masterGain,
+      mappings: state.mappings ?? {},
+      mqttSettings: state.mqttSettings,
+      midiSettings: state.midiSettings,
+    });
+    const updatedAt = new Date().toISOString();
+    const existingIndex = state.savedSets.findIndex(
+      (item) => item.name === stageId
+    );
+    const savedSets =
+      existingIndex >= 0
+        ? state.savedSets.map((item, index) =>
+            index === existingIndex ? { ...item, ...snapshot, updatedAt } : item
+          )
+        : [
+            ...state.savedSets,
+            { id: uuidv4(), name: stageId, ...snapshot, updatedAt },
+          ];
+    const activeSetId =
+      existingIndex >= 0
+        ? state.savedSets[existingIndex].id
+        : savedSets[savedSets.length - 1].id;
+
     set({
-      draft: createDraft({
-        tracks: state.tracks,
-        masterGain: state.masterGain,
-        mappings: state.mappings ?? {},
-        mqttSettings: state.mqttSettings,
-        midiSettings: state.midiSettings,
-        activeSetId: state.activeSetId,
-        activeSetName: state.activeSetName,
-      }),
+      draftsByStageId: { ...state.draftsByStageId, [stageId]: draft },
+      savedSets,
+      activeSetId,
+      activeSetName: stageId,
     });
   };
 
@@ -493,7 +550,7 @@ const useLiveSetStore = create<State>()(
         selectedTrackId: null,
         masterGain: 1,
         savedSets: [],
-        draft: null,
+        draftsByStageId: {},
         activeSetId: null,
         activeSetName: null,
         mqttSettings: defaultMqttSettings(config),
@@ -502,10 +559,21 @@ const useLiveSetStore = create<State>()(
         midiSettings: defaultMidiSettings(),
         midiInputs: [],
         midiError: null,
-        init: async () => {
+        init: async (stageId?: string) => {
           set({ loading: true });
-          let params = new URLSearchParams(document.location.search);
+          const params = new URLSearchParams(document.location.search);
+          // Hash-routed app (createHashRouter) owns everything after "#" as
+          // its own "path?query" — our data rides as that query string
+          // (e.g. "#/?set=..."), so pull out the part after "?", if any.
+          const rawHash = document.location.hash.replace(/^#/, "");
+          const hashQuery = rawHash.includes("?")
+            ? rawHash.slice(rawHash.indexOf("?") + 1)
+            : "";
+          const hashParams = new URLSearchParams(hashQuery);
           let configUrl = params.get("config");
+          const setUrl = params.get("set");
+          const setFragment = hashParams.get("set");
+          const roomOverride = params.get("room") ?? hashParams.get("room");
           let baseConfig = config;
 
           if (configUrl) {
@@ -515,43 +583,93 @@ const useLiveSetStore = create<State>()(
             console.log("loading config from internal json");
           }
 
-          const { savedSets, draft, activeSetId, activeSetName } = get();
-          const linkedSetId = draft?.activeSetId ?? activeSetId;
-          const linkedSet = linkedSetId
-            ? savedSets.find((item) => item.id === linkedSetId)
+          // Two ways to hand someone a set with no server involved:
+          // ?set=<url> points at a hosted JSON file (like ?config), while
+          // #set=<encoded> carries the whole set inline in the fragment, so
+          // it never leaves the browser.
+          let urlSet: ReturnType<typeof parseImportedSet> = null;
+          if (setFragment) {
+            try {
+              urlSet = parseImportedSet(
+                await decodeSetFromFragment(setFragment),
+                baseConfig
+              );
+              console.log("loading set from url fragment");
+            } catch (err) {
+              console.error("Failed to decode set from url fragment:", err);
+            }
+          } else if (setUrl) {
+            try {
+              urlSet = parseImportedSet(
+                (await axios.get(setUrl)).data,
+                baseConfig
+              );
+              console.log("loading set from url");
+            } catch (err) {
+              console.error("Failed to load set from url:", err);
+            }
+          }
+
+          // Each stage caches its own set: a saved set with a matching ID
+          // wins, else that stage's own autosaved draft, else a brand-new
+          // empty set — a stage id nobody's used before starts empty.
+          const wantedStageId = roomOverride || stageId || null;
+          const { savedSets, draftsByStageId } = get();
+          const linkedSet = wantedStageId
+            ? savedSets.find((item) => item.name === wantedStageId)
             : null;
+          const stageDraft = wantedStageId
+            ? draftsByStageId[wantedStageId]
+            : undefined;
+
+          // The set ID doubles as its MQTT room — one thing to name, not two.
+          const resolvedName = urlSet
+            ? slugify(urlSet.name ?? "") || "shared-set"
+            : wantedStageId;
 
           set({
             config: baseConfig,
             tracks: normalizeTracks(
-              draft?.tracks ?? linkedSet?.tracks ?? []
+              urlSet?.tracks ?? stageDraft?.tracks ?? linkedSet?.tracks ?? []
             ),
             mappings:
-              draft?.mappings ??
+              urlSet?.mappings ??
+              stageDraft?.mappings ??
               linkedSet?.mappings ??
               baseConfig.mappings ??
               {},
-            masterGain: draft?.masterGain ?? linkedSet?.masterGain ?? 1,
+            masterGain:
+              urlSet?.masterGain ??
+              stageDraft?.masterGain ??
+              linkedSet?.masterGain ??
+              1,
             mqttSettings: normalizeMqttSettings(
-              draft?.mqttSettings ?? linkedSet?.mqtt,
+              {
+                ...(urlSet?.mqtt ?? stageDraft?.mqttSettings ?? linkedSet?.mqtt),
+                roomId: roomOverride || roomIdForSetName(resolvedName),
+              },
               baseConfig
             ),
             midiSettings: normalizeMidiSettings(
-              draft?.midiSettings ?? linkedSet?.midi
+              urlSet?.midi ?? stageDraft?.midiSettings ?? linkedSet?.midi
             ),
-            activeSetId: draft?.activeSetId ?? activeSetId ?? null,
-            activeSetName:
-              draft?.activeSetName ??
-              activeSetName ??
-              linkedSet?.name ??
-              null,
+            activeSetId: urlSet
+              ? null
+              : (linkedSet?.id ?? stageDraft?.activeSetId ?? null),
+            activeSetName: resolvedName,
             loading: false,
           });
+
+          if (urlSet) {
+            autoSaveDraft(get, set, true);
+          }
         },
         start: async () => {
           set({ loading: true });
           const config = get().config;
-          ctx = new window.AudioContext();
+          if (!ctx) {
+            ctx = new window.AudioContext();
+          }
           if (ctx.state === "suspended") {
             await ctx.resume();
           }
@@ -957,84 +1075,28 @@ const useLiveSetStore = create<State>()(
             set({ selectedTrackId: trackId });
           }
         },
-        saveNewSet: (name: string) => {
-          const trimmed = name.trim();
-          if (!trimmed) return;
+        forkSet: (newStageId: string) => {
+          const trimmed = slugify(newStageId);
+          const currentStageId = get().mqttSettings.roomId;
+          if (!trimmed || trimmed === currentStageId) return;
 
-          const snapshot = snapshotSetState({
-            tracks: get().tracks,
-            masterGain: get().masterGain,
-            mappings: get().mappings ?? {},
-            mqttSettings: get().mqttSettings,
-            midiSettings: get().midiSettings,
-          });
-          const savedSet: SavedSet = {
-            id: uuidv4(),
-            name: trimmed,
-            ...snapshot,
-            updatedAt: new Date().toISOString(),
-          };
-
+          // Forking just moves the current content to a new stage ID —
+          // autoSaveDraft takes it from there, upserting a saved set under
+          // that ID (there's no existing one yet, so it creates a new one).
           set({
-            savedSets: [...get().savedSets, savedSet],
-            activeSetId: savedSet.id,
-            activeSetName: trimmed,
+            mqttSettings: { ...get().mqttSettings, roomId: trimmed },
           });
           autoSaveDraft(get, set, true);
-        },
-        updateActiveSet: (name?: string) => {
-          const activeSetId = get().activeSetId;
-          if (!activeSetId) return;
-
-          const existing = get().savedSets.find((item) => item.id === activeSetId);
-          if (!existing) return;
-
-          const trimmed = (name ?? existing.name).trim();
-          if (!trimmed) return;
-
-          const snapshot = snapshotSetState({
-            tracks: get().tracks,
-            masterGain: get().masterGain,
-            mappings: get().mappings ?? {},
-            mqttSettings: get().mqttSettings,
-            midiSettings: get().midiSettings,
-          });
-          const savedSet: SavedSet = {
-            ...existing,
-            name: trimmed,
-            ...snapshot,
-            updatedAt: new Date().toISOString(),
-          };
-
-          set({
-            savedSets: get().savedSets.map((item) =>
-              item.id === activeSetId ? savedSet : item
-            ),
-            activeSetName: trimmed,
-          });
-          autoSaveDraft(get, set, true);
-        },
-        saveCurrentSet: () => {
-          const { activeSetId, activeSetName, savedSets } = get();
-
-          if (activeSetId) {
-            get().updateActiveSet(activeSetName ?? undefined);
-            return;
-          }
-
-          const name =
-            activeSetName?.trim() || `Set ${savedSets.length + 1}`;
-          get().saveNewSet(name);
+          if (mqttMidi) void get().reconnectMqtt();
         },
         loadSet: async (id: string) => {
           const saved = get().savedSets.find((item) => item.id === id);
           if (!saved) return;
 
-          const mqttSettings = mergeMqttSettingsForLoad(
-            saved.mqtt,
-            get().mqttSettings,
-            get().config
-          );
+          const mqttSettings = {
+            ...mergeMqttSettingsForLoad(saved.mqtt, get().mqttSettings, get().config),
+            roomId: roomIdForSetName(saved.name),
+          };
           const midiSettings = normalizeMidiSettings(saved.midi);
 
           set({
@@ -1094,11 +1156,12 @@ const useLiveSetStore = create<State>()(
           }
 
           const tracks = normalizeTracks(parsed.tracks);
-          const mqttSettings = mergeMqttSettingsForLoad(
-            parsed.mqtt,
-            get().mqttSettings,
-            get().config
-          );
+          const setName =
+            slugify(parsed.name ?? suggestedName ?? "") || "imported-set";
+          const mqttSettings = {
+            ...mergeMqttSettingsForLoad(parsed.mqtt, get().mqttSettings, get().config),
+            roomId: roomIdForSetName(setName),
+          };
           const midiSettings = normalizeMidiSettings(parsed.midi);
           const snapshot = snapshotSetState({
             tracks,
@@ -1107,9 +1170,6 @@ const useLiveSetStore = create<State>()(
             mqttSettings,
             midiSettings,
           });
-          const setName =
-            (parsed.name ?? suggestedName ?? "Imported set").trim() ||
-            "Imported set";
           const savedSet: SavedSet = {
             id: uuidv4(),
             name: setName,
@@ -1155,6 +1215,22 @@ const useLiveSetStore = create<State>()(
           set(updates);
           autoSaveDraft(get, set, true);
         },
+        deleteStage: (stageId: string) => {
+          const { savedSets, draftsByStageId, activeSetName } = get();
+          const remainingDrafts = { ...draftsByStageId };
+          delete remainingDrafts[stageId];
+
+          const updates: Partial<State> = {
+            savedSets: savedSets.filter((item) => item.name !== stageId),
+            draftsByStageId: remainingDrafts,
+          };
+          if (activeSetName === stageId) {
+            updates.activeSetId = null;
+            updates.activeSetName = null;
+          }
+
+          set(updates);
+        },
         listenToMidi: async () => {
           await connectMidi(get, set);
         },
@@ -1164,7 +1240,7 @@ const useLiveSetStore = create<State>()(
         storage: createJSONStorage(() => localStorage),
         partialize: (state) => ({
           savedSets: state.savedSets,
-          draft: state.draft,
+          draftsByStageId: state.draftsByStageId,
           activeSetId: state.activeSetId,
           activeSetName: state.activeSetName,
         }),

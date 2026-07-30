@@ -1,12 +1,6 @@
-import { useCallback, useEffect } from "react";
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Drawer,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { useCallback, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Box, CircularProgress, Drawer, Stack } from "@mui/material";
 import useLiveSetStore from "../store/liveSet";
 import { shouldAutoConnectMqtt } from "../store/mqttSettings";
 import Tracks from "./Tracks";
@@ -48,8 +42,11 @@ function SoundCheck() {
   const tracks = useLiveSetStore((state) => state.tracks);
   const armedTracks = useLiveSetStore((state) => state.armedTracks);
   const loading = useLiveSetStore((state) => state.loading);
-  const saveCurrentSet = useLiveSetStore((state) => state.saveCurrentSet);
   const newEmptySet = useLiveSetStore((state) => state.newEmptySet);
+  const stageId = useLiveSetStore((state) => state.mqttSettings.roomId);
+  const navigate = useNavigate();
+  const { stageId: urlStageId } = useParams();
+  const urlStageIdRef = useRef(urlStageId);
   const activeSidebarPanel: SidebarPanel | null = showFileBrowser
     ? "fileBrowser"
     : showSetsLibrary
@@ -64,12 +61,18 @@ function SoundCheck() {
 
   useEffect(() => {
     const bootstrap = async () => {
-      await initOrchestra();
+      // /stage/:stageId/soundcheck: init() resolves this stage's set — a
+      // saved set with a matching ID, else that stage's own autosaved
+      // draft, else a brand-new empty one (Home always supplies an id).
+      await initOrchestra(urlStageIdRef.current);
       listenToMidi();
       const { mqttSettings } = useLiveSetStore.getState();
       if (shouldAutoConnectMqtt(mqttSettings)) {
         connectMqtt();
       }
+      // The AudioContext was already unlocked by the click that navigated
+      // here (Home's Soundcheck button/card), so this can just run.
+      await start();
     };
 
     if (useLiveSetStore.persist.hasHydrated()) {
@@ -80,17 +83,21 @@ function SoundCheck() {
     return useLiveSetStore.persist.onFinishHydration(() => {
       void bootstrap();
     });
-  }, [initOrchestra, listenToMidi, connectMqtt]);
+  }, [initOrchestra, listenToMidi, connectMqtt, start]);
+
+  // Keep the URL's stage segment in sync with whatever stage is actually
+  // active — renaming/loading/saving a set moves the address bar with it.
+  useEffect(() => {
+    if (loading) return;
+    navigate(`/stage/${stageId}/soundcheck`, { replace: true });
+  }, [loading, stageId, navigate]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey)) return;
 
       const key = event.key.toLowerCase();
-      if (key === "s") {
-        event.preventDefault();
-        saveCurrentSet();
-      } else if (key === "o") {
+      if (key === "o") {
         event.preventDefault();
         setShowFileBrowser(false);
         setShowSetsLibrary(true);
@@ -102,7 +109,7 @@ function SoundCheck() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [saveCurrentSet, newEmptySet, setShowFileBrowser, setShowSetsLibrary]);
+  }, [newEmptySet, setShowFileBrowser, setShowSetsLibrary]);
 
   const handleKeyPressed = useCallback(
     (note: number, velocity: number) => {
@@ -173,33 +180,10 @@ function SoundCheck() {
               flex: 1,
               alignItems: "center",
               justifyContent: "center",
-              maxWidth: 420,
-              mx: "auto",
               width: "100%",
             }}
           >
-            <Typography variant="h5" color="primary" sx={{ textAlign: "center" }}>
-              Sound check
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
-              This will eventually be the entry point for different stages and concert
-              rooms. For now, only the sound check is available.
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
-              Start the audio engine, then add tracks to build your live set.
-            </Typography>
-            <Button
-              onClick={start}
-              variant="contained"
-              size="large"
-              fullWidth
-              disabled={loading}
-              startIcon={
-                loading ? <CircularProgress size={16} color="inherit" /> : null
-              }
-            >
-              Turn on the engine
-            </Button>
+            <CircularProgress size={24} />
           </Stack>
         )}
 

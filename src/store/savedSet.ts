@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from "uuid";
 import {
   normalizeMqttSettings,
   parseMqttSettings,
@@ -147,11 +148,70 @@ export function parseImportedSet(data: unknown, config: any) {
   };
 }
 
-export function exportFilename(name: string | null) {
-  const base = (name || "live-set")
+async function gzip(bytes: Uint8Array): Promise<Uint8Array> {
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlToBytes(value: string): Uint8Array {
+  const padded = value
+    .replace(/-/g, "+")
+    .replace(/_/g, "/")
+    .padEnd(value.length + ((4 - (value.length % 4)) % 4), "=");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+// Fragment format: "<0|1>.<base64url>" — leading flag marks whether the
+// payload is gzip-compressed, so encode/decode can run on browsers that
+// support CompressionStream and ones that don't without breaking each other.
+export async function encodeSetForFragment(payload: unknown): Promise<string> {
+  const json = new TextEncoder().encode(JSON.stringify(payload));
+  const canCompress = typeof CompressionStream !== "undefined";
+  const bytes = canCompress ? await gzip(json) : json;
+  return `${canCompress ? "1" : "0"}.${bytesToBase64Url(bytes)}`;
+}
+
+export async function decodeSetFromFragment(encoded: string): Promise<unknown> {
+  const [flag, body] = encoded.includes(".")
+    ? [encoded.slice(0, encoded.indexOf(".")), encoded.slice(encoded.indexOf(".") + 1)]
+    : ["0", encoded];
+  const bytes = base64UrlToBytes(body);
+  const json =
+    flag === "1" && typeof DecompressionStream !== "undefined"
+      ? await gunzip(bytes)
+      : bytes;
+  return JSON.parse(new TextDecoder().decode(json));
+}
+
+// Set IDs double as MQTT topic segments and URL query values, so keep them
+// to a plain slug: lowercase letters, numbers, hyphens.
+export function slugify(value: string): string {
+  return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+export function randomStageId(): string {
+  return slugify(uuidv4().split("-")[0]);
+}
+
+export function exportFilename(name: string | null) {
+  const base = slugify(name || "live-set");
   return `${base || "live-set"}.json`;
 }
 

@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import styled from "@emotion/styled";
 import { Canvas } from "@react-three/fiber";
 import { extractBaseFrequenciesEnergy } from "../audio/utils";
@@ -21,11 +21,22 @@ let highEnergy = 0;
 function Stage() {
   const engine = useLiveSetStore((state) => state.engine);
   const subscribeToMqtt = useLiveSetStore((state) => state.subscribeToMqtt);
-  const roomId = useParams().roomId ?? "demo";
+  const stageId = useLiveSetStore((state) => state.mqttSettings.roomId);
+  const navigate = useNavigate();
+  const urlStageIdRef = useRef(useParams().stageId);
+
+  // The URL's stage segment only picks the stage on the initial deep link;
+  // from then on the store is the source of truth and the URL follows it.
+  useEffect(() => {
+    if (urlStageIdRef.current) {
+      subscribeToMqtt(urlStageIdRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
-    subscribeToMqtt(roomId);
-  }, [roomId, subscribeToMqtt]);
+    navigate(`/stage/${stageId}/live`, { replace: true });
+  }, [stageId, navigate]);
 
   useEffect(() => {
     core.on("fft", (e: { data: { real: ArrayLike<number> } }) => {
