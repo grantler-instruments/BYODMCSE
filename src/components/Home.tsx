@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type MouseEvent } from "react";
+import { useEffect, useState, type FormEvent, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -61,6 +61,26 @@ function Home() {
     primeAudioContext();
     navigate(`/stage/${id}/soundcheck`);
   };
+
+  useEffect(() => {
+    // A shared set/config link rides as "#/?set=..." (or "?config=...",
+    // "?room=..."), which now lands here since "/" owns the stage chooser.
+    // Forward straight into soundcheck, carrying the query along, so
+    // liveSet's init() (which reads it off document.location.hash) still
+    // sees it — otherwise the link silently dropped the shared set.
+    const rawHash = location.hash.replace(/^#/, "");
+    const hashQuery = rawHash.includes("?")
+      ? rawHash.slice(rawHash.indexOf("?") + 1)
+      : "";
+    if (!hashQuery) return;
+    const hashParams = new URLSearchParams(hashQuery);
+    if (!hashParams.has("set") && !hashParams.has("config")) return;
+    const targetStageId = hashParams.get("room") || randomStageId();
+    navigate(`/stage/${targetStageId}/soundcheck?${hashQuery}`, {
+      replace: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();

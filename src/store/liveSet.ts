@@ -576,8 +576,18 @@ const useLiveSetStore = create<State>()(
           const roomOverride = params.get("room") ?? hashParams.get("room");
           let baseConfig = config;
 
-          if (configUrl) {
-            baseConfig = (await axios.get(configUrl)).data;
+          const fetchTimeoutMs = 10000;
+          const [configResult, setResult] = await Promise.all([
+            configUrl
+              ? axios.get(configUrl, { timeout: fetchTimeoutMs })
+              : Promise.resolve(null),
+            setUrl && !setFragment
+              ? axios.get(setUrl, { timeout: fetchTimeoutMs })
+              : Promise.resolve(null),
+          ]);
+
+          if (configResult) {
+            baseConfig = configResult.data;
             console.log("loading config from external url");
           } else {
             console.log("loading config from internal json");
@@ -598,12 +608,9 @@ const useLiveSetStore = create<State>()(
             } catch (err) {
               console.error("Failed to decode set from url fragment:", err);
             }
-          } else if (setUrl) {
+          } else if (setResult) {
             try {
-              urlSet = parseImportedSet(
-                (await axios.get(setUrl)).data,
-                baseConfig
-              );
+              urlSet = parseImportedSet(setResult.data, baseConfig);
               console.log("loading set from url");
             } catch (err) {
               console.error("Failed to load set from url:", err);
